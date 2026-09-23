@@ -1,11 +1,22 @@
-# J3v
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo-dark.svg">
+    <img src="docs/logo-light.svg" alt="J3v" width="220">
+  </picture>
+</p>
 
-**J3v is to Jev as k3s is to k8s: calibrated System One decisions, compiled for the edge.**
+<p align="center">
+  <strong>J3v is to Jev as k3s is to k8s: calibrated System One decisions, compiled for the edge.</strong>
+</p>
+
+<p align="center">
 
 [![CI](https://github.com/JGalego/J3v/actions/workflows/ci.yml/badge.svg)](https://github.com/JGalego/J3v/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
 [![Targets](https://img.shields.io/badge/targets-pi%20%7C%20mcu-green.svg)](#architecture)
+
+</p>
 
 J3v is a **compiler**. You give it a schema of typed questions (`choice`, `score`, `noul`) and their allowed
 answers. It distills [Laya](https://huggingface.co/convaiinnovations/laya) into an artifact for one target,
