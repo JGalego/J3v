@@ -21,6 +21,9 @@ noul refund_requested "Does the user ask to get their money back?"
 noul wants_human "Does the user ask to talk to a human agent?"
 
 threshold 0.80
+# urgency is advisory (it orders the queue; it does not route the ticket), so a less certain answer is still
+# worth keeping locally. At 0.80 it alone sent ~21% of requests to Laya.
+threshold urgency 0.60
 
 require agreement >= 0.85
 require ece <= 0.05

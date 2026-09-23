@@ -24,7 +24,7 @@ fn main() -> ! {
         for (j, hd) in m.heads.iter().enumerate() {
             let (top, p) = j3v_mcu::calibrate(&mut z[j][..hd.k], hd.temperature);
             let (qid, keys) = model::QUESTIONS[j];
-            hprintln!("  {} = {} p_top={:.4} escalate={}", qid, keys[top], p, p < m.threshold);
+            hprintln!("  {} = {} p_top={:.4} escalate={}", qid, keys[top], p, p < hd.threshold);
         }
     }
     debug::exit(debug::EXIT_SUCCESS);

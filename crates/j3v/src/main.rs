@@ -20,7 +20,7 @@ USAGE:
   j3v check <schema.j3v|.json>                       parse + validate a schema, print canonical JSON
   j3v compile <schema> --target pi --encoder <enc.j3a> --states <states.jsonl> -o <out.j3a> [--budget 64MB]
   j3v compile <schema> --target mcu --budget 512KB --states <states.jsonl> -o <out.j3a>   (also writes <out>.rs)
-              [--build build] [--python python3] [--compiler-dir compiler] [--hidden 128] [--noul-mode native|choice]
+              [--build build] [--python python3] [--compiler-dir compiler] [--hidden 256] [--noul-mode native|choice]
   j3v encoder import <hf_dir> -o <enc.j3a> [source-id]
   j3v predict --encoder <enc.j3a> <artifact.j3a> '<request json>'
   j3v serve   --encoder <enc.j3a> <artifact.j3a> [--addr 0.0.0.0:8000] [--threads 1] [--upstream http://laya:8000]
@@ -86,7 +86,7 @@ fn main() {
                 build: get("build", "build"),
                 python: get("python", "python3"),
                 compiler_dir: get("compiler-dir", "compiler"),
-                hidden: get("hidden", "128").parse().unwrap_or_else(|_| die("error: --hidden must be an integer")),
+                hidden: get("hidden", "256").parse().unwrap_or_else(|_| die("error: --hidden must be an integer")),
                 noul_mode: get("noul-mode", "native"),
                 budget: fl.get("budget").map(|b| compile::parse_budget(b).unwrap_or_else(|e| die(format!("error: {}", e)))),
             };
@@ -189,7 +189,7 @@ fn main() {
                     for (j, hd) in m.heads.iter().enumerate() {
                         let (top, p) = j3v_mcu::calibrate(&mut z[j][..hd.k], hd.temperature);
                         let key = qs[j]["options"][top]["key"].as_str().unwrap_or("?");
-                        println!("  {} = {} p_top={:.4} escalate={}", qs[j]["id"].as_str().unwrap_or("?"), key, p, p < m.threshold);
+                        println!("  {} = {} p_top={:.4} escalate={}", qs[j]["id"].as_str().unwrap_or("?"), key, p, p < hd.threshold);
                     }
                 }
             });

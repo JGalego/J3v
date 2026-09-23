@@ -12,7 +12,8 @@ pub struct Engine {
     pub heads: Vec<Head>,
     pub schema: Schema,
     pub temps: Vec<f32>,
-    pub threshold: f64,
+    /// Escalation threshold per question.
+    pub thresholds: Vec<f64>,
     pub model: String,
 }
 
@@ -56,10 +57,10 @@ impl Engine {
             Some(t) => t.iter().map(|v| v.as_f64().unwrap_or(1.0) as f32).collect(),
             None => vec![1.0; heads.len()],
         };
-        let threshold = m["threshold"].as_f64().unwrap_or(schema.threshold);
+        let thresholds = schema.questions.iter().map(|q| schema.threshold_for(&q.id)).collect();
         let h = m["schema_hash"].as_str().unwrap_or("dev");
         let model = format!("j3v-pi/{}@{}", schema.name, &h[..h.len().min(8)]);
-        Ok(Engine { enc, heads, schema, temps, threshold, model })
+        Ok(Engine { enc, heads, schema, temps, thresholds, model })
     }
 
     /// Raw head logits for one state (one encoder pass for all questions).
@@ -88,7 +89,7 @@ impl Engine {
         let q = &self.schema.questions[j];
         let top = argmax(p);
         let p_top = p[top] as f64;
-        let ext = json!({"p_top": r4(p_top), "escalate": local && p_top < self.threshold, "tier": tier});
+        let ext = json!({"p_top": r4(p_top), "escalate": local && p_top < self.thresholds[j], "tier": tier});
         let probs: Map<String, Value> = q.options.iter().zip(p).map(|(o, &v)| (o.key.clone(), json!(r4(v as f64)))).collect();
         match q.qtype {
             QType::Choice => json!({"type": "choice", "choice": q.options[top].key, "probabilities": probs,

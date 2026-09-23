@@ -19,6 +19,8 @@ pub struct Head<'a> {
     pub b: &'a [f32],
     pub k: usize,
     pub temperature: f32,
+    /// Calibrated p_top below which this question escalates to the next tier.
+    pub threshold: f32,
 }
 
 pub struct Model<'a> {
@@ -32,7 +34,6 @@ pub struct Model<'a> {
     pub s1: &'a [f32],
     pub b1: &'a [f32],
     pub heads: &'a [Head<'a>],
-    pub threshold: f32,
 }
 
 #[inline]

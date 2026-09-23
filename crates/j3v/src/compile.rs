@@ -321,9 +321,10 @@ pub fn certify(p: &Prepared, zc: &[Vec<Vec<f32>>], zt: &[Vec<Vec<f32>>]) -> (Vec
             let err: Vec<f64> = test.iter().zip(&ps).map(|(&i, p)| (ev(p) - ev(&tp[i])).abs()).collect();
             bootstrap(err.len(), 1000, seed, |ix| ix.iter().map(|&i| err[i]).sum::<f64>() / ix.len() as f64)
         });
-        let kept: Vec<usize> = (0..test.len()).filter(|&r| conf[r] >= schema.threshold).collect();
+        let thr = schema.threshold_for(&q.id);
+        let kept: Vec<usize> = (0..test.len()).filter(|&r| conf[r] >= thr).collect();
         let selective = Selective {
-            threshold: schema.threshold,
+            threshold: thr,
             coverage: kept.len() as f64 / test.len() as f64,
             accuracy: if kept.is_empty() { f64::NAN } else { kept.iter().filter(|&&r| correct[r]).count() as f64 / kept.len() as f64 },
             n: kept.len(),
@@ -377,10 +378,10 @@ pub fn certify(p: &Prepared, zc: &[Vec<Vec<f32>>], zt: &[Vec<Vec<f32>>]) -> (Vec
                 ));
             }
         }
-        if r.selective.n > 0 && r.selective.accuracy < schema.threshold {
+        if r.selective.n > 0 && r.selective.accuracy < thr {
             failures.push(format!(
                 "question `{}`: cascade contract broken: answers kept at p_top >= {:.2} are only {:.3} accurate",
-                q.id, schema.threshold, r.selective.accuracy
+                q.id, thr, r.selective.accuracy
             ));
         }
         reports.push(r);
@@ -392,7 +393,7 @@ fn base_report(o: &Opts, p: &Prepared, t0: Instant) -> Value {
     json!({
         "schema": p.schema.name, "schema_hash": p.schema.hash(), "target": o.target, "teacher": p.teacher_meta,
         "states": {"file": o.states, "hash": p.states_hash, "train": p.train.len(), "calib": p.calib.len(), "test": p.test.len()},
-        "require": p.schema.require, "threshold": p.schema.threshold, "compile_seconds": t0.elapsed().as_secs_f64(),
+        "require": p.schema.require, "threshold": p.schema.threshold, "thresholds": p.schema.thresholds, "compile_seconds": t0.elapsed().as_secs_f64(),
     })
 }
 
@@ -446,7 +447,7 @@ fn compile_pi(o: &Opts, schema: Schema) -> Result<Outcome, String> {
     )?;
 
     // run the draft artifact end-to-end (text -> tokenizer -> int8 encoder -> heads) on calib + test
-    let mut art = Artifact::load(&draft.to_string_lossy())?;
+    let mut art = crate::heads::quantize(&Artifact::load(&draft.to_string_lossy())?, schema.questions.len())?;
     art.header.meta = json!({"schema": schema.to_canonical_json(), "encoder": enc.id});
     let eng = Engine::new(enc, &art)?;
     let nq = schema.questions.len();

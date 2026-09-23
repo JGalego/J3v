@@ -66,7 +66,7 @@ fn handle(eng: &Engine, up: &Option<Tier>, key: &Option<String>, mut s: TcpStrea
         ("GET", "/v1/schema") => respond(
             &mut s,
             200,
-            &json!({"model": eng.model, "threshold": eng.threshold,
+            &json!({"model": eng.model, "thresholds": eng.schema.questions.iter().zip(&eng.thresholds).map(|(q, t)| (q.id.clone(), json!(t))).collect::<serde_json::Map<_, _>>(),
             "questions": eng.schema.to_laya_questions()}),
         ),
         ("POST", "/v1/systemone") => {
@@ -118,7 +118,7 @@ pub fn serve(eng: Engine, up: Option<Tier>, addr: &str) -> std::io::Result<()> {
     let l = TcpListener::bind(addr)?;
     eprintln!("[j3v] serving {} on http://{} (POST /v1/systemone){}", eng.model, addr, if key.is_some() { ", bearer auth on" } else { "" });
     if let Some(t) = &up {
-        eprintln!("[j3v] escalating answers below p_top {} to {}", eng.threshold, t.name());
+        eprintln!("[j3v] escalating answers below their p_top threshold to {}", t.name());
     }
     let (eng, up) = (Arc::new(eng), Arc::new(up));
     for s in l.incoming().flatten() {

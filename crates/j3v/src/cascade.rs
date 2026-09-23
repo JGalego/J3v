@@ -84,12 +84,17 @@ impl Tier {
         }
     }
 
-    pub fn threshold(&self) -> Option<f64> {
+    /// Escalation threshold for question `j` (None for the final tier, which answers everything).
+    pub fn threshold(&self, j: usize) -> Option<f64> {
         match self {
-            Tier::Mcu(m) => Some(m.threshold as f64),
-            Tier::Pi(e) => Some(e.threshold),
+            Tier::Mcu(m) => Some(m.thresholds[j] as f64),
+            Tier::Pi(e) => Some(e.thresholds[j]),
             _ => None,
         }
+    }
+
+    pub fn thresholds(&self, nq: usize) -> Value {
+        json!((0..nq).map(|j| self.threshold(j)).collect::<Vec<_>>())
     }
 
     /// Calibrated probabilities for the questions `qs` (schema indices).
@@ -208,6 +213,14 @@ struct Routed {
     reach: Vec<Vec<Vec<usize>>>,
 }
 
+/// What a tier's answer to question `j` on case `ci` is checked against: ground truth when the state has it,
+/// otherwise the final tier's answer (the reference the students were distilled from). The final tier has no
+/// reference for itself.
+fn target(cases: &[Case], full: &[Vec<Vec<Vec<f32>>>], ci: usize, j: usize, ti: usize) -> Option<usize> {
+    let nt = full.len();
+    cases[ci].gt[j].or_else(|| (ti + 1 < nt).then(|| argmax(&full[nt - 1][ci][j])))
+}
+
 fn route(tiers: &[Tier], nq: usize, cases: &[Case], full: &[Vec<Vec<Vec<f32>>>], temps: &[Vec<f32>]) -> Routed {
     let nt = tiers.len();
     let mut r = Routed { kept: vec![vec![(0, 0, 0); nq]; nt], calls: vec![0; nt], correct: (0, 0), reach: vec![vec![vec![]; nq]; nt] };
@@ -218,17 +231,18 @@ fn route(tiers: &[Tier], nq: usize, cases: &[Case], full: &[Vec<Vec<Vec<f32>>>],
                 break;
             }
             r.calls[ti] += 1;
-            let thr = tiers[ti].threshold().unwrap_or(0.0);
             let mut next = Vec::new();
             for &j in &pending {
                 r.reach[ti][j].push(ci);
                 let p = temper(&full[ti][ci][j], temps[ti][j]);
                 let top = argmax(&p);
-                if ti == nt - 1 || p[top] as f64 >= thr {
+                if ti == nt - 1 || p[top] as f64 >= tiers[ti].threshold(j).unwrap_or(0.0) {
                     r.kept[ti][j].0 += 1;
-                    if let Some(g) = c.gt[j] {
+                    if let Some(g) = target(cases, full, ci, j, ti) {
                         r.kept[ti][j].1 += 1;
                         r.kept[ti][j].2 += (top == g) as usize;
+                    }
+                    if let Some(g) = c.gt[j] {
                         r.correct.0 += (top == g) as usize;
                         r.correct.1 += 1;
                     }
@@ -272,7 +286,7 @@ pub fn run(schema: &Schema, tiers: &[Tier], calib: &[Case], test: &[Case]) -> Re
         }
         let mut l = lat[ti].clone();
         l.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        per_tier.push(json!({"tier": t.name(), "threshold": t.threshold(), "questions": qs,
+        per_tier.push(json!({"tier": t.name(), "threshold": t.thresholds(nq), "questions": qs,
                              "latency_ms_p50": l[l.len() / 2], "latency_ms_p95": l[(l.len() * 95 / 100).min(l.len() - 1)]}));
     }
     // conditional calibration, tier by tier, on calib
@@ -281,14 +295,15 @@ pub fn run(schema: &Schema, tiers: &[Tier], calib: &[Case], test: &[Case]) -> Re
     for ti in 1..nt {
         let r = route(tiers, nq, calib, &fc, &temps);
         for j in 0..nq {
-            let ix: Vec<usize> = r.reach[ti][j].iter().copied().filter(|&ci| calib[ci].gt[j].is_some()).collect();
+            let ix: Vec<usize> = r.reach[ti][j].iter().copied().filter(|&ci| target(calib, &fc, ci, j, ti).is_some()).collect();
             if ix.len() >= 30 {
                 let z: Vec<Vec<f32>> = ix.iter().map(|&ci| fc[ti][ci][j].iter().map(|&x| x.max(1e-7).ln()).collect()).collect();
-                let y: Vec<usize> = ix.iter().map(|&ci| calib[ci].gt[j].unwrap()).collect();
+                let y: Vec<usize> = ix.iter().map(|&ci| target(calib, &fc, ci, j, ti).unwrap()).collect();
                 temps[ti][j] = fit_temperature(&z, &y);
-                temp_notes[ti][j] = format!("refit on {} escalated calib states", ix.len());
+                let src = if calib.iter().all(|c| c.gt[j].is_none()) { "final-tier answers" } else { "ground truth" };
+                temp_notes[ti][j] = format!("refit on {} escalated calib states vs {}", ix.len(), src);
             } else {
-                temp_notes[ti][j] = format!("kept marginal: only {} labelled escalated calib states", ix.len());
+                temp_notes[ti][j] = format!("kept marginal: only {} escalated calib states with a target", ix.len());
             }
         }
     }
@@ -301,7 +316,7 @@ pub fn run(schema: &Schema, tiers: &[Tier], calib: &[Case], test: &[Case]) -> Re
                 let (a, l, k) = r.kept[ti][j];
                 let acc = (l > 0).then(|| k as f64 / l as f64);
                 let hi = wilson_hi(k, l);
-                if let (Some(acc), Some(thr)) = (acc, tiers[ti].threshold()) {
+                if let (Some(acc), Some(thr)) = (acc, tiers[ti].threshold(j)) {
                     if l >= 20 && hi < thr {
                         failures.push(format!(
                             "tier `{}` question `{}`: kept answers are {:.3} accurate (n={}, 95% upper bound {:.3}), below its threshold {:.2}",
@@ -309,7 +324,8 @@ pub fn run(schema: &Schema, tiers: &[Tier], calib: &[Case], test: &[Case]) -> Re
                         ));
                     }
                 }
-                qs.push(json!({"id": q.id, "answered": a, "share": a as f64 / test.len() as f64, "labelled": l,
+                let tgt = if test.iter().any(|c| c.gt[j].is_some()) { "ground-truth" } else { "final tier" };
+                qs.push(json!({"id": q.id, "answered": a, "share": a as f64 / test.len() as f64, "labelled": l, "target": tgt,
                                "accuracy_on_kept": acc, "accuracy_on_kept_hi": hi}));
             }
             out.push(json!({"tier": tiers[ti].name(), "requests_reaching_tier": r.calls[ti], "questions": qs}));

@@ -42,7 +42,7 @@ pub struct Owned {
     b1: Vec<f32>,
     heads: Vec<(Vec<i8>, Vec<f32>, Vec<f32>, usize)>,
     pub temps: Vec<f32>,
-    pub threshold: f32,
+    pub thresholds: Vec<f32>,
 }
 
 impl Owned {
@@ -54,7 +54,7 @@ impl Owned {
             let (w, s, sh) = q8(a, &format!("q{}.w", j))?;
             heads.push((w, s, a.f32(&format!("q{}.b", j))?, sh[0]));
         }
-        Ok(Owned { c, emb, emb_s, w1, s1, b1: a.f32("b1")?, heads, temps: vec![1.0; nq], threshold: 0.8 })
+        Ok(Owned { c, emb, emb_s, w1, s1, b1: a.f32("b1")?, heads, temps: vec![1.0; nq], thresholds: vec![0.8; nq] })
     }
 
     pub fn load(a: &Artifact) -> Result<Self, String> {
@@ -80,13 +80,20 @@ impl Owned {
             temps: mt["calibration"]["temperature"]
                 .as_array()
                 .map_or(vec![1.0; nq], |t| t.iter().map(|v| v.as_f64().unwrap() as f32).collect()),
-            threshold: mt["threshold"].as_f64().unwrap_or(0.8) as f32,
+            thresholds: {
+                let s: Schema = serde_json::from_value(mt["schema"].clone()).map_err(|e| e.to_string())?;
+                s.questions.iter().map(|q| s.threshold_for(&q.id) as f32).collect()
+            },
         })
     }
 
     pub fn with<R>(&self, f: impl FnOnce(&m::Model) -> R) -> R {
-        let heads: Vec<m::Head> =
-            self.heads.iter().zip(&self.temps).map(|((w, s, b, k), &t)| m::Head { w, s, b, k: *k, temperature: t }).collect();
+        let heads: Vec<m::Head> = self
+            .heads
+            .iter()
+            .zip(self.temps.iter().zip(&self.thresholds))
+            .map(|((w, s, b, k), (&t, &th))| m::Head { w, s, b, k: *k, temperature: t, threshold: th })
+            .collect();
         let model = m::Model {
             buckets: self.c.buckets as u32,
             dim: self.c.dim,
@@ -98,7 +105,6 @@ impl Owned {
             s1: &self.s1,
             b1: &self.b1,
             heads: &heads,
-            threshold: self.threshold,
         };
         f(&model)
     }
@@ -170,14 +176,14 @@ impl Owned {
             let _ = writeln!(s, "    ({:?}, &[{}]),", q.id, keys.join(", "));
         }
         let _ = writeln!(s, "];\n\nstatic HEADS: [Head<'static>; {}] = [", self.heads.len());
-        for (j, ((_, _, _, k), t)) in self.heads.iter().zip(&self.temps).enumerate() {
-            let _ = writeln!(s, "    Head {{ w: &Q{j}_W, s: &Q{j}_S, b: &Q{j}_B, k: {k}, temperature: {t:?} }},", j = j, k = k, t = t);
+        for (j, (((_, _, _, k), t), th)) in self.heads.iter().zip(&self.temps).zip(&self.thresholds).enumerate() {
+            let _ = writeln!(s, "    Head {{ w: &Q{j}_W, s: &Q{j}_S, b: &Q{j}_B, k: {k}, temperature: {t:?}, threshold: {th:?} }},");
         }
         let _ = writeln!(s, "];\n");
         let _ = writeln!(
             s,
-            "pub static MODEL: Model<'static> = Model {{\n    buckets: {}, dim: {}, hidden: {}, max_bytes: {},\n    emb: &EMB, emb_s: &EMB_S, w1: &W1, s1: &S1, b1: &B1,\n    heads: &HEADS, threshold: {:?},\n}};",
-            self.c.buckets, self.c.dim, self.c.hidden, MAX_BYTES, self.threshold
+            "pub static MODEL: Model<'static> = Model {{\n    buckets: {}, dim: {}, hidden: {}, max_bytes: {},\n    emb: &EMB, emb_s: &EMB_S, w1: &W1, s1: &S1, b1: &B1,\n    heads: &HEADS,\n}};",
+            self.c.buckets, self.c.dim, self.c.hidden, MAX_BYTES
         );
         s
     }
@@ -267,7 +273,7 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
         let (zc, zt) = (run(&p.calib), run(&p.test));
         let (reports, failures, temps) = certify(&p, &zc, &zt);
         om.temps = temps;
-        om.threshold = schema.threshold as f32;
+        om.thresholds = schema.questions.iter().map(|q| schema.threshold_for(&q.id) as f32).collect();
         let summary = json!({"buckets": c.buckets, "dim": c.dim, "hidden": c.hidden, "flash_bytes": flash, "ram_bytes": ram,
                              "passed": failures.is_empty(), "failures": failures,
                              "agreement": reports.iter().map(|r| (r.id.clone(), r.agreement.value)).collect::<Vec<_>>(),

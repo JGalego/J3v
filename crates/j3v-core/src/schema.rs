@@ -99,6 +99,9 @@ pub struct Schema {
     pub max_state_tokens: usize,
     /// Calibrated top-1 probability below which the artifact escalates to the next tier.
     pub threshold: f64,
+    /// Per-question escalation thresholds (`threshold <question> <p>`), overriding `threshold`.
+    #[serde(default)]
+    pub thresholds: std::collections::BTreeMap<String, f64>,
     pub require: Requirements,
     pub questions: Vec<Question>,
 }
@@ -115,6 +118,7 @@ impl Schema {
             "teacher": self.teacher,
             "max_state_tokens": self.max_state_tokens,
             "threshold": self.threshold,
+            "thresholds": self.thresholds,
             "require": serde_json::to_value(&self.require).expect("requirements serialize"),
             "questions": self.questions.iter().map(|q| json!({
                 "id": q.id, "type": q.qtype.name(), "instructions": q.instructions,
@@ -160,6 +164,11 @@ impl Schema {
             m.insert(q.id.clone(), v);
         }
         Value::Object(m)
+    }
+
+    /// Escalation threshold for one question.
+    pub fn threshold_for(&self, id: &str) -> f64 {
+        self.thresholds.get(id).copied().unwrap_or(self.threshold)
     }
 
     pub fn question(&self, id: &str) -> Option<&Question> {
@@ -324,6 +333,7 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
     let mut teacher = "laya".to_string();
     let mut max_state_tokens = 128usize;
     let mut threshold = 0.8f64;
+    let mut thresholds = std::collections::BTreeMap::new();
     let mut require = Requirements::default();
     let mut questions: Vec<Question> = Vec::new();
     let mut qlines: Vec<usize> = Vec::new();
@@ -397,8 +407,19 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
                 end(2)?;
             }
             "threshold" => {
-                threshold = num(arg(1, "a probability")?, 0.0, 1.0)?;
-                end(2)?;
+                // `threshold 0.8` (schema-wide) or `threshold <question> 0.6`
+                match toks.get(1).map(|t| &t.tok) {
+                    Some(Tok::Word(q)) => {
+                        let v = num(arg(2, "a probability")?, 0.0, 1.0)?;
+                        end(3)?;
+                        scoped.push((q.clone(), "threshold".into(), ln, toks[1].col));
+                        thresholds.insert(q.clone(), v);
+                    }
+                    _ => {
+                        threshold = num(arg(1, "a probability")?, 0.0, 1.0)?;
+                        end(2)?;
+                    }
+                }
             }
             "require" => {
                 let m = arg(1, "a metric")?;
@@ -503,8 +524,12 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
     for (q, metric, ln, col) in &scoped {
         match questions.iter().find(|x| &x.id == q) {
             None => {
-                return Err(SchemaError::new(*ln, *col, format!("`require` names unknown question `{}`", q))
-                    .help(format!("questions: {}", questions.iter().map(|x| x.id.as_str()).collect::<Vec<_>>().join(", "))))
+                return Err(SchemaError::new(
+                    *ln,
+                    *col,
+                    format!("`{}` names unknown question `{}`", if metric == "threshold" { "threshold" } else { "require" }, q),
+                )
+                .help(format!("questions: {}", questions.iter().map(|x| x.id.as_str()).collect::<Vec<_>>().join(", "))))
             }
             Some(x) if metric == "mae" && x.qtype != QType::Score => {
                 return Err(SchemaError::new(*ln, *col, format!("`mae` only applies to score questions; `{}` is a {}", q, x.qtype.name())))
@@ -512,7 +537,7 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
             _ => {}
         }
     }
-    Ok(Schema { name, version, teacher, max_state_tokens, threshold, require, questions })
+    Ok(Schema { name, version, teacher, max_state_tokens, threshold, thresholds, require, questions })
 }
 
 fn parse_option(q: &mut Question, toks: &[Spanned], ln: usize) -> Result<(), SchemaError> {
@@ -589,6 +614,7 @@ pub fn from_laya_json(v: &Value) -> Result<Schema, String> {
         teacher: v.get("teacher").and_then(Value::as_str).unwrap_or("laya").to_string(),
         max_state_tokens: 128,
         threshold: v.get("threshold").and_then(Value::as_f64).unwrap_or(0.8),
+        thresholds: Default::default(),
         require: Requirements::default(),
         questions,
     };
@@ -664,6 +690,9 @@ require accuracy >= 0.8
         assert_eq!(s.questions[0].options[1], Opt { key: "other".into(), description: None });
         assert_eq!(s.questions[1].options[1].key, "1");
         assert_eq!(s.threshold, 0.7);
+        let t = parse_dsl(&format!("{}threshold urgency 0.55\n", SRC)).unwrap();
+        assert_eq!((t.threshold_for("urgency"), t.threshold_for("dept")), (0.55, 0.7));
+        assert!(parse_dsl(&format!("{}threshold nope 0.5\n", SRC)).unwrap_err().msg.contains("unknown question"));
         assert_eq!(s.require.accuracy, Some(0.8));
     }
 

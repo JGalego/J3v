@@ -4,7 +4,7 @@
 //! state, then a 2-layer MLP to K logits. Options are baked into the weights at compile time, so one
 //! encoder pass answers every question (Laya needs one cross-encoder pass per question).
 
-use j3v_core::artifact::Artifact;
+use j3v_core::artifact::{Artifact, DType};
 
 pub struct Head {
     a: Vec<f32>,
@@ -23,16 +23,19 @@ fn gelu_tanh(x: f32) -> f32 {
 impl Head {
     pub fn load(a: &Artifact, j: usize) -> Result<Self, String> {
         let p = |n: &str| format!("q{}.{}", j, n);
+        // weights are stored int8 with per-row scales (`.s`) in shipped artifacts, f32 in compile-time drafts
+        let w = |n: &str| -> Result<Vec<f32>, String> {
+            match a.info(&p(n)).map(|t| t.dtype) {
+                Some(DType::I8) => {
+                    let (q, s) = (a.i8(&p(n))?, a.f32(&p(&format!("{}.s", n)))?);
+                    let cols = q.len() / s.len();
+                    Ok(q.iter().enumerate().map(|(i, &v)| v as f32 * s[i / cols]).collect())
+                }
+                _ => a.f32(&p(n)),
+            }
+        };
         let sh = a.shape(&p("w2"))?.to_vec();
-        Ok(Head {
-            a: a.f32(&p("a"))?,
-            w1: a.f32(&p("w1"))?,
-            b1: a.f32(&p("b1"))?,
-            w2: a.f32(&p("w2"))?,
-            b2: a.f32(&p("b2"))?,
-            k: sh[0],
-            hid: sh[1],
-        })
+        Ok(Head { a: a.f32(&p("a"))?, w1: w("w1")?, b1: a.f32(&p("b1"))?, w2: w("w2")?, b2: a.f32(&p("b2"))?, k: sh[0], hid: sh[1] })
     }
 
     /// h: encoder output [t, d] -> K raw logits.
@@ -60,4 +63,21 @@ impl Head {
             .map(|o| self.w2[o * self.hid..(o + 1) * self.hid].iter().zip(&x).map(|(a, b)| a * b).sum::<f32>() + self.b2[o])
             .collect()
     }
+}
+
+/// Draft (f32) heads -> shipped heads: int8 per-row weights for the two matrices, f32 for vectors.
+pub fn quantize(draft: &Artifact, nq: usize) -> Result<Artifact, String> {
+    let mut out = Artifact::new("pi-heads", draft.header.meta.clone());
+    for j in 0..nq {
+        let p = |n: &str| format!("q{}.{}", j, n);
+        out.add_f32(&p("a"), draft.shape(&p("a"))?, &draft.f32(&p("a"))?);
+        for (m, b) in [("w1", "b1"), ("w2", "b2")] {
+            let sh = draft.shape(&p(m))?.to_vec();
+            let (q, s) = crate::encoder::quantize_rows(&draft.f32(&p(m))?, sh[0], sh[1]);
+            out.add_i8(&p(m), &sh, &q);
+            out.add_f32(&p(&format!("{}.s", m)), &[sh[0]], &s);
+            out.add_f32(&p(b), draft.shape(&p(b))?, &draft.f32(&p(b))?);
+        }
+    }
+    Ok(out)
 }
