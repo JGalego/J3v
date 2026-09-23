@@ -12,31 +12,28 @@ answers. It distills [Laya](https://huggingface.co/convaiinnovations/laya) into 
 fits temperature scaling, and **refuses to emit** an artifact that misses its accuracy/ECE bounds or its
 flash/RAM budget. It returns calibrated probabilities, never text, and speaks Laya's `POST /v1/systemone` shape.
 
-## Install
+## Getting Started
 
-On Linux (x86_64, 64-bit ARM, or 32-bit ARM such as a Raspberry Pi):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/JGalego/J3v/main/install.sh | sh
-```
-
-To also download the shared encoder and the example models into `./j3v-models`:
+**1. Install** (Linux: x86_64, 64-bit ARM, or 32-bit ARM such as a Raspberry Pi). The installer verifies checksums;
+`J3V_VERSION` pins a release, and `J3V_INSTALL_DIR` changes the install location.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/JGalego/J3v/main/install.sh | J3V_MODELS=j3v-models sh
-j3v predict --encoder j3v-models/minilm.j3a j3v-models/support_triage.pi.j3a '{"state": {"message": "refund me"}}'
+# or build from source: cargo install --path crates/j3v
 ```
 
-The script verifies checksums. `J3V_VERSION` pins a release, and `J3V_INSTALL_DIR` changes the install location.
-
-## Getting Started
+**2. Try the example** (`J3V_MODELS` above downloaded the shared encoder and the example artifacts):
 
 ```bash
-cargo install --path crates/j3v
-pip install -r compiler/requirements.txt   # compile time only
+j3v predict --encoder j3v-models/minilm.j3a j3v-models/support_triage.pi.j3a '{"state": {"message": "refund me"}}'
+j3v serve j3v-models/support_triage.pi.j3a --encoder j3v-models/minilm.j3a
+```
 
-j3v compile schemas/support_triage.j3v --target pi --encoder minilm.j3a --states states.jsonl -o triage.j3a
-j3v serve triage.j3a --encoder minilm.j3a
+**3. Compile your own schema** (needs the repo and Python, at compile time only):
+
+```bash
+pip install -r compiler/requirements.txt
+j3v compile schemas/support_triage.j3v --target pi --encoder j3v-models/minilm.j3a --states states.jsonl -o triage.j3a
 ```
 
 A schema declares questions, a confidence threshold for escalation, and the bounds the artifact must meet:
