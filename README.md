@@ -21,6 +21,10 @@ answers. It distills [Laya](https://huggingface.co/convaiinnovations/laya) into 
 fits temperature scaling, and **refuses to emit** an artifact that misses its accuracy/ECE bounds or its
 flash/RAM budget. It returns calibrated probabilities, never text, and speaks Laya's `POST /v1/systemone` shape.
 
+<p align="center">
+  <img src="demo/getting-started.gif" alt="Installing J3v on a Raspberry Pi, then running predict and serve">
+</p>
+
 ## Getting Started
 
 **1. Install** (Linux: x86_64, 64-bit ARM, or 32-bit ARM such as a Raspberry Pi). The installer verifies checksums;
