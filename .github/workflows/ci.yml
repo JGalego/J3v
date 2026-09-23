@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: fmt + clippy + test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets -- -D clippy::correctness
+      - run: cargo test --workspace
+      - name: schema DSL smoke check
+        run: cargo run --release -q -- check schemas/support_triage.j3v > /dev/null
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: python compiler stage compiles
+        run: python -m compileall -q compiler
+
+  static:
+    name: static pi binary (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [x86_64-unknown-linux-musl, aarch64-unknown-linux-musl]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release --target ${{ matrix.target }} -p j3v
+      - name: check static + report size
+        run: |
+          f=target/${{ matrix.target }}/release/j3v
+          file $f | tee /dev/stderr | grep -q "static"
+          echo "### j3v (${{ matrix.target }}): $(stat -c %s $f) bytes" >> $GITHUB_STEP_SUMMARY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: j3v-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/j3v
