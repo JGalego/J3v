@@ -283,22 +283,19 @@ fn cascade_cmd(fl: &HashMap<String, String>) {
     let rows = compile::read_rows(fl.get("states").unwrap_or_else(|| die("error: --states is required"))).unwrap_or_else(|e| die(e));
     let split = fl.get("split").map(String::as_str).unwrap_or("test");
     let n: usize = fl.get("n").map(|v| v.parse().unwrap()).unwrap_or(usize::MAX);
-    let cases: Vec<Case> = rows
-        .iter()
-        .filter(|r| split == "all" || compile::split_of(&r.id) == 2)
-        .take(n)
-        .map(|r| Case {
-            id: r.id.clone(),
-            state: r.state.clone(),
-            gt: schema
-                .questions
-                .iter()
-                .map(|q| r.labels.get(&q.id).and_then(Value::as_str).and_then(|k| q.options.iter().position(|o| o.key == k)))
-                .collect(),
-        })
-        .collect();
+    let to_case = |r: &compile::Row| Case {
+        id: r.id.clone(),
+        state: r.state.clone(),
+        gt: schema
+            .questions
+            .iter()
+            .map(|q| r.labels.get(&q.id).and_then(Value::as_str).and_then(|k| q.options.iter().position(|o| o.key == k)))
+            .collect(),
+    };
+    let calib: Vec<Case> = rows.iter().filter(|r| compile::split_of(&r.id) == 1).take(n).map(to_case).collect();
+    let cases: Vec<Case> = rows.iter().filter(|r| split == "all" || compile::split_of(&r.id) == 2).take(n).map(to_case).collect();
     eprintln!("[j3v] cascade {} on {} states", tiers.iter().map(|t| t.name()).collect::<Vec<_>>().join(" -> "), cases.len());
-    let rep = cascade::run(&schema, &tiers, &cases).unwrap_or_else(|e| die(format!("error: {}", e)));
+    let rep = cascade::run(&schema, &tiers, &calib, &cases).unwrap_or_else(|e| die(format!("error: {}", e)));
     if let Some(out) = fl.get("out") {
         std::fs::write(out, serde_json::to_string_pretty(&rep).unwrap()).unwrap();
     }
@@ -314,18 +311,25 @@ fn cascade_cmd(fl: &HashMap<String, String>) {
             );
         }
     }
-    eprintln!("\nrouting (per question):");
-    for t in rep["routing"].as_array().unwrap() {
-        eprintln!("  {} (reached by {} requests)", t["tier"].as_str().unwrap(), t["requests_reaching_tier"]);
-        for q in t["questions"].as_array().unwrap() {
-            eprintln!(
-                "    {:<18} kept {:>5.1}%  accuracy on kept {}",
-                q["id"].as_str().unwrap(),
-                q["share"].as_f64().unwrap() * 100.0,
-                q["accuracy_on_kept"].as_f64().map_or("-".into(), |v| format!("{:.3}", v))
-            );
+    for (key, title) in
+        [("routing_uncorrected", "routing with marginal calibration only"), ("routing", "routing with conditional calibration")]
+    {
+        eprintln!("\n{}:", title);
+        for t in rep[key].as_array().unwrap() {
+            eprintln!("  {} (reached by {} requests)", t["tier"].as_str().unwrap(), t["requests_reaching_tier"]);
+            for q in t["questions"].as_array().unwrap() {
+                eprintln!(
+                    "    {:<18} kept {:>5.1}%  accuracy on kept {} (n={})",
+                    q["id"].as_str().unwrap(),
+                    q["share"].as_f64().unwrap() * 100.0,
+                    q["accuracy_on_kept"].as_f64().map_or("-".into(), |v| format!("{:.3}", v)),
+                    q["labelled"]
+                );
+            }
         }
     }
+    eprintln!("\nconditional temperatures: {}", rep["conditional_calibration"]);
+    eprintln!("cascade accuracy with marginal calibration only: {:.3}", rep["cascade_accuracy_uncorrected"].as_f64().unwrap_or(f64::NAN));
     eprintln!(
         "\ncascade accuracy {:.3}, expected latency {:.2} ms/request",
         rep["cascade_accuracy"].as_f64().unwrap_or(f64::NAN),

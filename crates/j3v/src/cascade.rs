@@ -7,7 +7,7 @@
 
 use crate::engine::Engine;
 use crate::mcu::Owned;
-use j3v_core::metrics::{accuracy_est, argmax, ece_est, softmax_t, Est};
+use j3v_core::metrics::{accuracy_est, argmax, ece_est, fit_temperature, softmax_t, Est};
 use j3v_core::schema::{state_text, QType, Schema};
 use serde_json::{json, Map, Value};
 use std::io::{Read, Write};
@@ -160,16 +160,11 @@ pub struct Case {
     pub gt: Vec<Option<usize>>,
 }
 
-/// Run every tier on every case (for per-tier calibration), then route per question through the cascade.
-pub fn run(schema: &Schema, tiers: &[Tier], cases: &[Case]) -> Result<Value, String> {
-    let nq = schema.questions.len();
-    let all: Vec<usize> = (0..nq).collect();
-    // full[t][c][j] = calibrated probs of tier t on case c, question j; lat[t] = per-call latency (ms)
-    let mut full = Vec::new();
-    let mut lat = Vec::new();
+fn eval_all(schema: &Schema, tiers: &[Tier], cases: &[Case]) -> Result<(Vec<Vec<Vec<Vec<f32>>>>, Vec<Vec<f64>>), String> {
+    let all: Vec<usize> = (0..schema.questions.len()).collect();
+    let (mut full, mut lat) = (Vec::new(), Vec::new());
     for t in tiers {
-        let mut rows = Vec::new();
-        let mut l = Vec::new();
+        let (mut rows, mut l) = (Vec::new(), Vec::new());
         for (i, c) in cases.iter().enumerate() {
             let t0 = Instant::now();
             rows.push(t.probs(schema, &c.id, &c.state, &all)?);
@@ -181,14 +176,92 @@ pub fn run(schema: &Schema, tiers: &[Tier], cases: &[Case]) -> Result<Value, Str
         full.push(rows);
         lat.push(l);
     }
+    Ok((full, lat))
+}
+
+/// Re-temper a calibrated distribution: softmax(ln p / t).
+fn temper(p: &[f32], t: f32) -> Vec<f32> {
+    if t == 1.0 {
+        return p.to_vec();
+    }
+    let z: Vec<f32> = p.iter().map(|&x| x.max(1e-7).ln()).collect();
+    let mut out = vec![0f32; p.len()];
+    softmax_t(&z, t, &mut out);
+    out
+}
+
+/// Wilson score interval upper bound (95%, one-sided z = 1.645).
+fn wilson_hi(k: usize, n: usize) -> f64 {
+    if n == 0 {
+        return 1.0;
+    }
+    let (z, n, ph) = (1.645f64, n as f64, k as f64 / n as f64);
+    ((ph + z * z / (2.0 * n)) + z * ((ph * (1.0 - ph) + z * z / (4.0 * n)) / n).sqrt()) / (1.0 + z * z / n)
+}
+
+struct Routed {
+    /// kept[t][j] = (answered, labelled, correct)
+    kept: Vec<Vec<(usize, usize, usize)>>,
+    calls: Vec<usize>,
+    correct: (usize, usize),
+    /// reach[t][j] = case indices whose question j reached tier t
+    reach: Vec<Vec<Vec<usize>>>,
+}
+
+fn route(tiers: &[Tier], nq: usize, cases: &[Case], full: &[Vec<Vec<Vec<f32>>>], temps: &[Vec<f32>]) -> Routed {
+    let nt = tiers.len();
+    let mut r = Routed { kept: vec![vec![(0, 0, 0); nq]; nt], calls: vec![0; nt], correct: (0, 0), reach: vec![vec![vec![]; nq]; nt] };
+    for (ci, c) in cases.iter().enumerate() {
+        let mut pending: Vec<usize> = (0..nq).collect();
+        for ti in 0..nt {
+            if pending.is_empty() {
+                break;
+            }
+            r.calls[ti] += 1;
+            let thr = tiers[ti].threshold().unwrap_or(0.0);
+            let mut next = Vec::new();
+            for &j in &pending {
+                r.reach[ti][j].push(ci);
+                let p = temper(&full[ti][ci][j], temps[ti][j]);
+                let top = argmax(&p);
+                if ti == nt - 1 || p[top] as f64 >= thr {
+                    r.kept[ti][j].0 += 1;
+                    if let Some(g) = c.gt[j] {
+                        r.kept[ti][j].1 += 1;
+                        r.kept[ti][j].2 += (top == g) as usize;
+                        r.correct.0 += (top == g) as usize;
+                        r.correct.1 += 1;
+                    }
+                } else {
+                    next.push(j);
+                }
+            }
+            pending = next;
+        }
+    }
+    r
+}
+
+/// Certify a cascade.
+///
+/// Each tier is calibrated on the whole state distribution at compile time, but a tier after the first only ever
+/// sees what earlier tiers escalated: the hard, ambiguous states, where distilled students are wrong together.
+/// So the cascade refits one temperature per (tier, question) on the calib states that actually reach that tier
+/// ("conditional calibration"), then routes the test states and checks that every non-final tier's kept answers
+/// are at least as accurate as its threshold (one-sided 95% Wilson bound).
+pub fn run(schema: &Schema, tiers: &[Tier], calib: &[Case], test: &[Case]) -> Result<Value, String> {
+    let (nq, nt) = (schema.questions.len(), tiers.len());
+    let (fc, _) = eval_all(schema, tiers, calib)?;
+    let (ft, lat) = eval_all(schema, tiers, test)?;
+    // per-tier marginal calibration on the test states
     let mut per_tier = Vec::new();
     for (ti, t) in tiers.iter().enumerate() {
         let mut qs = Vec::new();
         for (j, q) in schema.questions.iter().enumerate() {
-            let lab: Vec<(f64, bool)> = cases
+            let lab: Vec<(f64, bool)> = test
                 .iter()
                 .enumerate()
-                .filter_map(|(ci, c)| c.gt[j].map(|g| (full[ti][ci][j][argmax(&full[ti][ci][j])] as f64, argmax(&full[ti][ci][j]) == g)))
+                .filter_map(|(ci, c)| c.gt[j].map(|g| (ft[ti][ci][j][argmax(&ft[ti][ci][j])] as f64, argmax(&ft[ti][ci][j]) == g)))
                 .collect();
             let conf: Vec<f64> = lab.iter().map(|x| x.0).collect();
             let cor: Vec<bool> = lab.iter().map(|x| x.1).collect();
@@ -202,72 +275,66 @@ pub fn run(schema: &Schema, tiers: &[Tier], cases: &[Case]) -> Result<Value, Str
         per_tier.push(json!({"tier": t.name(), "threshold": t.threshold(), "questions": qs,
                              "latency_ms_p50": l[l.len() / 2], "latency_ms_p95": l[(l.len() * 95 / 100).min(l.len() - 1)]}));
     }
-    // routing
-    let nt = tiers.len();
-    let mut kept = vec![vec![(0usize, 0usize, 0usize); nq]; nt]; // (answered, labelled, correct)
-    let mut correct_total = (0usize, 0usize);
-    let mut calls = vec![0usize; nt];
-    for (ci, c) in cases.iter().enumerate() {
-        let mut pending: Vec<usize> = all.clone();
+    // conditional calibration, tier by tier, on calib
+    let mut temps = vec![vec![1f32; nq]; nt];
+    let mut temp_notes = vec![vec![String::from("marginal (tier sees every state)"); nq]; nt];
+    for ti in 1..nt {
+        let r = route(tiers, nq, calib, &fc, &temps);
+        for j in 0..nq {
+            let ix: Vec<usize> = r.reach[ti][j].iter().copied().filter(|&ci| calib[ci].gt[j].is_some()).collect();
+            if ix.len() >= 30 {
+                let z: Vec<Vec<f32>> = ix.iter().map(|&ci| fc[ti][ci][j].iter().map(|&x| x.max(1e-7).ln()).collect()).collect();
+                let y: Vec<usize> = ix.iter().map(|&ci| calib[ci].gt[j].unwrap()).collect();
+                temps[ti][j] = fit_temperature(&z, &y);
+                temp_notes[ti][j] = format!("refit on {} escalated calib states", ix.len());
+            } else {
+                temp_notes[ti][j] = format!("kept marginal: only {} labelled escalated calib states", ix.len());
+            }
+        }
+    }
+    let ones = vec![vec![1f32; nq]; nt];
+    let report_routing = |r: &Routed, failures: &mut Vec<String>| -> Value {
+        let mut out = Vec::new();
         for ti in 0..nt {
-            if pending.is_empty() {
-                break;
-            }
-            calls[ti] += 1;
-            let last = ti == nt - 1;
-            let thr = tiers[ti].threshold().unwrap_or(0.0);
-            let mut next = Vec::new();
-            for &j in &pending {
-                let p = &full[ti][ci][j];
-                let top = argmax(p);
-                if last || p[top] as f64 >= thr {
-                    kept[ti][j].0 += 1;
-                    if let Some(g) = c.gt[j] {
-                        kept[ti][j].1 += 1;
-                        kept[ti][j].2 += (top == g) as usize;
-                        correct_total.0 += (top == g) as usize;
-                        correct_total.1 += 1;
+            let mut qs = Vec::new();
+            for (j, q) in schema.questions.iter().enumerate() {
+                let (a, l, k) = r.kept[ti][j];
+                let acc = (l > 0).then(|| k as f64 / l as f64);
+                let hi = wilson_hi(k, l);
+                if let (Some(acc), Some(thr)) = (acc, tiers[ti].threshold()) {
+                    if l >= 20 && hi < thr {
+                        failures.push(format!(
+                            "tier `{}` question `{}`: kept answers are {:.3} accurate (n={}, 95% upper bound {:.3}), below its threshold {:.2}",
+                            tiers[ti].name(), q.id, acc, l, hi, thr
+                        ));
                     }
-                } else {
-                    next.push(j);
                 }
+                qs.push(json!({"id": q.id, "answered": a, "share": a as f64 / test.len() as f64, "labelled": l,
+                               "accuracy_on_kept": acc, "accuracy_on_kept_hi": hi}));
             }
-            pending = next;
+            out.push(json!({"tier": tiers[ti].name(), "requests_reaching_tier": r.calls[ti], "questions": qs}));
         }
-    }
-    let mut routing = Vec::new();
+        Value::Array(out)
+    };
+    let mut ignored = Vec::new();
+    let naive = route(tiers, nq, test, &ft, &ones);
+    let naive_json = report_routing(&naive, &mut ignored);
+    let routed = route(tiers, nq, test, &ft, &temps);
     let mut failures = Vec::new();
-    for ti in 0..nt {
-        let mut qs = Vec::new();
-        for (j, q) in schema.questions.iter().enumerate() {
-            let (a, l, k) = kept[ti][j];
-            let acc = if l > 0 { Some(k as f64 / l as f64) } else { None };
-            if let (Some(acc), Some(thr)) = (acc, tiers[ti].threshold()) {
-                if l >= 20 && acc < thr {
-                    failures.push(format!(
-                        "tier `{}` question `{}`: kept answers are {:.3} accurate, below its threshold {:.2}",
-                        tiers[ti].name(),
-                        q.id,
-                        acc,
-                        thr
-                    ));
-                }
-            }
-            qs.push(json!({"id": q.id, "answered": a, "share": a as f64 / cases.len() as f64, "accuracy_on_kept": acc}));
-        }
-        routing.push(json!({"tier": tiers[ti].name(), "requests_reaching_tier": calls[ti], "questions": qs}));
-    }
-    // cost model: mean latency = sum over tiers of (fraction of requests reaching the tier) x (tier p50)
+    let routing = report_routing(&routed, &mut failures);
     let mean_latency: f64 = (0..nt)
         .map(|ti| {
             let mut l = lat[ti].clone();
             l.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            calls[ti] as f64 / cases.len() as f64 * l[l.len() / 2]
+            routed.calls[ti] as f64 / test.len() as f64 * l[l.len() / 2]
         })
         .sum();
+    let acc = |r: &Routed| (r.correct.1 > 0).then(|| r.correct.0 as f64 / r.correct.1 as f64);
+    let cal: Vec<Value> = (0..nt).map(|ti| json!({"tier": tiers[ti].name(), "temperature": temps[ti], "note": temp_notes[ti]})).collect();
     Ok(json!({
-        "n": cases.len(), "tiers": per_tier, "routing": routing,
-        "cascade_accuracy": if correct_total.1 > 0 { Some(correct_total.0 as f64 / correct_total.1 as f64) } else { None },
+        "n_calib": calib.len(), "n": test.len(), "tiers": per_tier, "conditional_calibration": cal,
+        "routing_uncorrected": naive_json, "cascade_accuracy_uncorrected": acc(&naive), "uncorrected_violations": ignored,
+        "routing": routing, "cascade_accuracy": acc(&routed),
         "expected_latency_ms": mean_latency, "passed": failures.is_empty(), "failures": failures,
     }))
 }
