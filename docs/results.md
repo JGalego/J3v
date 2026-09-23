@@ -6,14 +6,14 @@ bootstrap limits. Full reports: [`examples/support_triage/`](../examples/support
 
 ## M2: `pi` target
 
-Shared encoder: all-MiniLM-L6-v2, int8 (22.6M params, 23.8 MB). Heads: 3.1 MB (f32, hidden 256).
+Shared encoder: all-MiniLM-L6-v2, int8 (22.6M params, 23.8 MB). Heads: 794 KB (int8, hidden 256).
 
 | question | agreement w/ Laya | ECE | accuracy vs ground truth | Laya's accuracy |
 |---|---|---|---|---|
 | department (5-way) | 0.971 | 0.020 | 0.931 | 0.923 |
-| urgency (3-level score) | 0.859 | 0.031 | n/a (no labels) | n/a |
-| refund_requested (noul) | 0.980 | 0.010 | 0.971 | 0.961 |
-| wants_human (noul) | 0.971 | 0.010 | 0.950 | 0.940 |
+| urgency (3-level score) | 0.860 | 0.032 | n/a (no labels) | n/a |
+| refund_requested (noul) | 0.980 | 0.009 | 0.971 | 0.961 |
+| wants_human (noul) | 0.970 | 0.011 | 0.950 | 0.940 |
 
 Binary: static musl, 1.0 MB (aarch64), 1.2 MB (x86_64). Latency for all 4 questions on 1 core, 1 thread, mean
 13.8 tokens: **p50 6.7 ms / p95 9.4 ms** on an ARM64 Neoverse-N2 CI runner. A Pi 5 (Cortex-A76) will be somewhat slower.
@@ -32,8 +32,10 @@ Laya's model card gives 193–464 ms on CPU; we measured 705 ms p50 for 4 questi
 Budget 512 KB. The compiler trained 6 sizes and shipped the smallest that passes: 1024 buckets × 64 dim, hidden 64,
 **73 KB of weights, ~2 KB RAM**. Firmware: 18 KB of code. The output under QEMU `mps2-an500` is byte-identical to
 the host runtime, which CI checks on every push. Agreement 0.966 / 0.820 / 0.975 / 0.954, ECE ≤ 0.029, accuracy
-vs ground truth 0.928 / – / 0.976 / 0.940. On-device latency is **not measured**: QEMU is not cycle-accurate, and
-there was no board.
+vs ground truth 0.928 / – / 0.976 / 0.940. Latency proxy: under QEMU `-icount`, one inference (all 4 questions)
+executes **~100k instructions**, which is ~210 µs on an STM32H743 at 480 MHz if it runs at 1 cycle per
+instruction. That is an estimate, not a silicon measurement: real CPI on the M7 depends on dual issue and flash
+wait states. The same firmware reports cycles when flashed to a board.
 
 ## M5: cascade mcu → pi → Laya
 
@@ -42,10 +44,12 @@ there was no board.
   same teacher on the same data, so they are wrong together.
 - **Fix:** refit one temperature per (tier, question) on the calib states that actually reach that tier
   (conditional calibration). Gate: each non-final tier's kept answers must meet its threshold (Wilson 95% bound).
-- **Offline (1614 test states, cached Laya answers):** mcu answers 90–97% of each labelled question. Laya is reached
-  by 36% of requests, mostly because of `urgency`. Cascade accuracy 0.950. Laya is *less* accurate than the
+- **Per-question thresholds:** `urgency` is advisory, so it escalates below 0.60 instead of 0.80. Unlabelled
+  questions are calibrated and gated against the final tier's answer.
+- **Offline (1614 test states, cached Laya answers; runs in CI):** the mcu tier keeps 89–97% of each question.
+  Laya is reached by 25% of requests (36% before per-question thresholds). Cascade accuracy 0.950. Laya is *less* accurate than the
   students on what reaches it (0.44–0.64), because those states are the ambiguous ones. On this data the cascade
   buys compute, not accuracy.
-- **Live (300 test states, `laya-serve` on CPU):** contract holds. After re-tempering, Laya's ECE is 0.014–0.030.
+- **Live (300 test states, `laya-serve` on CPU; measured before per-question thresholds):** contract holds. After re-tempering, Laya's ECE is 0.014–0.030.
   Cascade accuracy 0.951, expected latency 269 ms/request, dominated by Laya's 705 ms. `j3v serve --upstream` does the
   same escalation at runtime, per question.
