@@ -1,0 +1,479 @@
+{
+  "n_calib": 798,
+  "n": 1614,
+  "tiers": [
+    {
+      "tier": "mcu",
+      "threshold": 0.800000011920929,
+      "questions": [
+        {
+          "id": "department",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9275092936802974,
+            "lo": 0.9169764560099133,
+            "hi": 0.9380421313506815,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.02861301541845447,
+            "lo": 0.022968843579292297,
+            "hi": 0.03812097576175628,
+            "n": 1614
+          }
+        },
+        {
+          "id": "urgency",
+          "n_labelled": 0,
+          "accuracy": null,
+          "ece": null
+        },
+        {
+          "id": "refund_requested",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.976456009913259,
+            "lo": 0.9702602230483272,
+            "hi": 0.9820322180916976,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.010650943830849365,
+            "lo": 0.008106900081315448,
+            "hi": 0.01837796726191354,
+            "n": 1614
+          }
+        },
+        {
+          "id": "wants_human",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9399008674101611,
+            "lo": 0.9299876084262702,
+            "hi": 0.949814126394052,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.01231283828376099,
+            "lo": 0.010380809819683562,
+            "hi": 0.02313016065139014,
+            "n": 1614
+          }
+        }
+      ],
+      "latency_ms_p50": 0.004884,
+      "latency_ms_p95": 0.005519
+    },
+    {
+      "tier": "pi",
+      "threshold": 0.8,
+      "questions": [
+        {
+          "id": "department",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9306071871127634,
+            "lo": 0.9200743494423792,
+            "hi": 0.9405204460966543,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.019584865448938723,
+            "lo": 0.01657139030752572,
+            "hi": 0.02990251524740879,
+            "n": 1614
+          }
+        },
+        {
+          "id": "urgency",
+          "n_labelled": 0,
+          "accuracy": null,
+          "ece": null
+        },
+        {
+          "id": "refund_requested",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9714993804213135,
+            "lo": 0.9640644361833953,
+            "hi": 0.9776951672862454,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.009830398076528954,
+            "lo": 0.007499440858207522,
+            "hi": 0.01725812014446235,
+            "n": 1614
+          }
+        },
+        {
+          "id": "wants_human",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9504337050805453,
+            "lo": 0.9411400247831475,
+            "hi": 0.9591078066914498,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.01048258046678451,
+            "lo": 0.009569117755547184,
+            "hi": 0.021973722116950128,
+            "n": 1614
+          }
+        }
+      ],
+      "latency_ms_p50": 11.154262,
+      "latency_ms_p95": 16.879939
+    },
+    {
+      "tier": "laya(cached)",
+      "threshold": null,
+      "questions": [
+        {
+          "id": "department",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9231722428748451,
+            "lo": 0.9114002478314746,
+            "hi": 0.9337050805452293,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.023646143363163227,
+            "lo": 0.018738145980397712,
+            "hi": 0.03460704316437023,
+            "n": 1614
+          }
+        },
+        {
+          "id": "urgency",
+          "n_labelled": 0,
+          "accuracy": null,
+          "ece": null
+        },
+        {
+          "id": "refund_requested",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9609665427509294,
+            "lo": 0.9535315985130112,
+            "hi": 0.9690210656753407,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.011212026245679702,
+            "lo": 0.007913775492778054,
+            "hi": 0.018848107059058056,
+            "n": 1614
+          }
+        },
+        {
+          "id": "wants_human",
+          "n_labelled": 1614,
+          "accuracy": {
+            "value": 0.9399008674101611,
+            "lo": 0.9306071871127634,
+            "hi": 0.9491945477075588,
+            "n": 1614
+          },
+          "ece": {
+            "value": 0.009786431157160574,
+            "lo": 0.009824248716290555,
+            "hi": 0.022565534382209165,
+            "n": 1614
+          }
+        }
+      ],
+      "latency_ms_p50": 0.000553,
+      "latency_ms_p95": 0.0011510000000000001
+    }
+  ],
+  "conditional_calibration": [
+    {
+      "tier": "mcu",
+      "temperature": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "note": [
+        "marginal (tier sees every state)",
+        "marginal (tier sees every state)",
+        "marginal (tier sees every state)",
+        "marginal (tier sees every state)"
+      ]
+    },
+    {
+      "tier": "pi",
+      "temperature": [
+        1.177096962928772,
+        1.0,
+        2.7583625316619873,
+        1.828574538230896
+      ],
+      "note": [
+        "refit on 87 escalated calib states",
+        "kept marginal: only 0 labelled escalated calib states",
+        "refit on 30 escalated calib states",
+        "refit on 78 escalated calib states"
+      ]
+    },
+    {
+      "tier": "laya(cached)",
+      "temperature": [
+        1.1545705795288086,
+        1.0,
+        1.0,
+        3.353081226348877
+      ],
+      "note": [
+        "refit on 81 escalated calib states",
+        "kept marginal: only 0 labelled escalated calib states",
+        "kept marginal: only 28 labelled escalated calib states",
+        "refit on 72 escalated calib states"
+      ]
+    }
+  ],
+  "routing_uncorrected": [
+    {
+      "tier": "mcu",
+      "requests_reaching_tier": 1614,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 1457,
+          "share": 0.90272614622057,
+          "labelled": 1457,
+          "accuracy_on_kept": 0.9759780370624571,
+          "accuracy_on_kept_hi": 0.9817470609026224
+        },
+        {
+          "id": "urgency",
+          "answered": 1049,
+          "share": 0.6499380421313506,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 1564,
+          "share": 0.9690210656753407,
+          "labelled": 1564,
+          "accuracy_on_kept": 0.9865728900255755,
+          "accuracy_on_kept_hi": 0.9905890501437515
+        },
+        {
+          "id": "wants_human",
+          "answered": 1464,
+          "share": 0.9070631970260223,
+          "labelled": 1464,
+          "accuracy_on_kept": 0.9760928961748634,
+          "accuracy_on_kept_hi": 0.9818345568105484
+        }
+      ]
+    },
+    {
+      "tier": "pi",
+      "requests_reaching_tier": 793,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 34,
+          "share": 0.021065675340768277,
+          "labelled": 34,
+          "accuracy_on_kept": 0.7941176470588235,
+          "accuracy_on_kept_hi": 0.8843420981123216
+        },
+        {
+          "id": "urgency",
+          "answered": 219,
+          "share": 0.13568773234200743,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 30,
+          "share": 0.01858736059479554,
+          "labelled": 30,
+          "accuracy_on_kept": 0.6666666666666666,
+          "accuracy_on_kept_hi": 0.7891720597717535
+        },
+        {
+          "id": "wants_human",
+          "answered": 64,
+          "share": 0.03965303593556382,
+          "labelled": 64,
+          "accuracy_on_kept": 0.890625,
+          "accuracy_on_kept_hi": 0.9396074762462042
+        }
+      ]
+    },
+    {
+      "tier": "laya(cached)",
+      "requests_reaching_tier": 523,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 123,
+          "share": 0.0762081784386617,
+          "labelled": 123,
+          "accuracy_on_kept": 0.42276422764227645,
+          "accuracy_on_kept_hi": 0.4969251527174034
+        },
+        {
+          "id": "urgency",
+          "answered": 346,
+          "share": 0.21437422552664187,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 20,
+          "share": 0.012391573729863693,
+          "labelled": 20,
+          "accuracy_on_kept": 0.55,
+          "accuracy_on_kept_hi": 0.7158890598605915
+        },
+        {
+          "id": "wants_human",
+          "answered": 86,
+          "share": 0.05328376703841388,
+          "labelled": 86,
+          "accuracy_on_kept": 0.5581395348837209,
+          "accuracy_on_kept_hi": 0.6431208707659837
+        }
+      ]
+    }
+  ],
+  "cascade_accuracy_uncorrected": 0.9518793886823627,
+  "uncorrected_violations": [
+    "tier `pi` question `refund_requested`: kept answers are 0.667 accurate (n=30, 95% upper bound 0.789), below its threshold 0.80"
+  ],
+  "routing": [
+    {
+      "tier": "mcu",
+      "requests_reaching_tier": 1614,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 1457,
+          "share": 0.90272614622057,
+          "labelled": 1457,
+          "accuracy_on_kept": 0.9759780370624571,
+          "accuracy_on_kept_hi": 0.9817470609026224
+        },
+        {
+          "id": "urgency",
+          "answered": 1049,
+          "share": 0.6499380421313506,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 1564,
+          "share": 0.9690210656753407,
+          "labelled": 1564,
+          "accuracy_on_kept": 0.9865728900255755,
+          "accuracy_on_kept_hi": 0.9905890501437515
+        },
+        {
+          "id": "wants_human",
+          "answered": 1464,
+          "share": 0.9070631970260223,
+          "labelled": 1464,
+          "accuracy_on_kept": 0.9760928961748634,
+          "accuracy_on_kept_hi": 0.9818345568105484
+        }
+      ]
+    },
+    {
+      "tier": "pi",
+      "requests_reaching_tier": 793,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 24,
+          "share": 0.01486988847583643,
+          "labelled": 24,
+          "accuracy_on_kept": 0.8333333333333334,
+          "accuracy_on_kept_hi": 0.9229024739994866
+        },
+        {
+          "id": "urgency",
+          "answered": 219,
+          "share": 0.13568773234200743,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 2,
+          "share": 0.0012391573729863693,
+          "labelled": 2,
+          "accuracy_on_kept": 0.5,
+          "accuracy_on_kept_hi": 0.8791480193875478
+        },
+        {
+          "id": "wants_human",
+          "answered": 19,
+          "share": 0.011771995043370507,
+          "labelled": 19,
+          "accuracy_on_kept": 0.9473684210526315,
+          "accuracy_on_kept_hi": 0.9881707066183946
+        }
+      ]
+    },
+    {
+      "tier": "laya(cached)",
+      "requests_reaching_tier": 588,
+      "questions": [
+        {
+          "id": "department",
+          "answered": 133,
+          "share": 0.08240396530359356,
+          "labelled": 133,
+          "accuracy_on_kept": 0.44360902255639095,
+          "accuracy_on_kept_hi": 0.5148971551972761
+        },
+        {
+          "id": "urgency",
+          "answered": 346,
+          "share": 0.21437422552664187,
+          "labelled": 0,
+          "accuracy_on_kept": null,
+          "accuracy_on_kept_hi": 1.0
+        },
+        {
+          "id": "refund_requested",
+          "answered": 48,
+          "share": 0.02973977695167286,
+          "labelled": 48,
+          "accuracy_on_kept": 0.5416666666666666,
+          "accuracy_on_kept_hi": 0.6545691780565361
+        },
+        {
+          "id": "wants_human",
+          "answered": 131,
+          "share": 0.0811648079306072,
+          "labelled": 131,
+          "accuracy_on_kept": 0.6412213740458015,
+          "accuracy_on_kept_hi": 0.7066581585076906
+        }
+      ]
+    }
+  ],
+  "cascade_accuracy": 0.9504337050805453,
+  "expected_latency_ms": 5.485463262701362,
+  "passed": true,
+  "failures": []
+}

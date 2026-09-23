@@ -1,6 +1,7 @@
 //! Minimal blocking HTTP/1.1 server exposing the Laya/Jev `POST /v1/systemone` shape.
 //! No framework: the pi binary stays small and static.
 
+use crate::cascade::Tier;
 use crate::engine::Engine;
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -27,7 +28,7 @@ fn respond(s: &mut TcpStream, code: u16, body: &Value) {
     );
 }
 
-fn handle(eng: &Engine, key: &Option<String>, mut s: TcpStream) {
+fn handle(eng: &Engine, up: &Option<Tier>, key: &Option<String>, mut s: TcpStream) {
     let mut r = BufReader::new(s.try_clone().unwrap());
     let mut line = String::new();
     if r.read_line(&mut line).is_err() {
@@ -76,6 +77,9 @@ fn handle(eng: &Engine, key: &Option<String>, mut s: TcpStream) {
             };
             match eng.answer(&req) {
                 Ok(mut v) => {
+                    if let (Some(tier), true) = (up, v["escalate"].as_bool() == Some(true)) {
+                        escalate(eng, tier, &req["state"], &mut v);
+                    }
                     v["latency_ms"] = json!((t.elapsed().as_secs_f64() * 1e4).round() / 10.0);
                     respond(&mut s, 200, &v)
                 }
@@ -86,14 +90,40 @@ fn handle(eng: &Engine, key: &Option<String>, mut s: TcpStream) {
     }
 }
 
-pub fn serve(eng: Engine, addr: &str) -> std::io::Result<()> {
+/// Forward the questions this tier is unsure about to the upstream, and splice its (re-tempered) answers in.
+/// If the upstream fails, the local answers stay, still flagged `escalate: true`, and the error is reported.
+fn escalate(eng: &Engine, tier: &Tier, state: &Value, v: &mut Value) {
+    let js: Vec<usize> = eng
+        .schema
+        .questions
+        .iter()
+        .enumerate()
+        .filter(|(_, q)| v["answers"][&q.id]["j3v"]["escalate"].as_bool() == Some(true))
+        .map(|(j, _)| j)
+        .collect();
+    match tier.probs(&eng.schema, "", state, &js) {
+        Ok(ps) => {
+            for (&j, p) in js.iter().zip(&ps) {
+                v["answers"][&eng.schema.questions[j].id] = eng.render(j, p, "upstream", false);
+            }
+            v["escalate"] = json!(false);
+            v["escalated"] = json!(js.iter().map(|&j| eng.schema.questions[j].id.clone()).collect::<Vec<_>>());
+        }
+        Err(e) => v["upstream_error"] = json!(e),
+    }
+}
+
+pub fn serve(eng: Engine, up: Option<Tier>, addr: &str) -> std::io::Result<()> {
     let key = std::env::var("J3V_API_KEY").ok().filter(|k| !k.is_empty());
     let l = TcpListener::bind(addr)?;
     eprintln!("[j3v] serving {} on http://{} (POST /v1/systemone){}", eng.model, addr, if key.is_some() { ", bearer auth on" } else { "" });
-    let eng = Arc::new(eng);
+    if let Some(t) = &up {
+        eprintln!("[j3v] escalating answers below p_top {} to {}", eng.threshold, t.name());
+    }
+    let (eng, up) = (Arc::new(eng), Arc::new(up));
     for s in l.incoming().flatten() {
-        let (eng, key) = (eng.clone(), key.clone());
-        std::thread::spawn(move || handle(&eng, &key, s));
+        let (eng, up, key) = (eng.clone(), up.clone(), key.clone());
+        std::thread::spawn(move || handle(&eng, &up, &key, s));
     }
     Ok(())
 }

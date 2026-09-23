@@ -23,7 +23,7 @@ USAGE:
               [--build build] [--python python3] [--compiler-dir compiler] [--hidden 128] [--noul-mode native|choice]
   j3v encoder import <hf_dir> -o <enc.j3a> [source-id]
   j3v predict --encoder <enc.j3a> <artifact.j3a> '<request json>'
-  j3v serve   --encoder <enc.j3a> <artifact.j3a> [--addr 0.0.0.0:8000] [--threads 1]
+  j3v serve   --encoder <enc.j3a> <artifact.j3a> [--addr 0.0.0.0:8000] [--threads 1] [--upstream http://laya:8000]
   j3v bench   --encoder <enc.j3a> <artifact.j3a> <states.jsonl> [--n 500]
   j3v mcu-codegen <mcu.j3a> -o <model.rs>            firmware source for an mcu artifact
   j3v mcu-predict <mcu.j3a> <inputs.txt>            host run of the mcu model (same output as the firmware)
@@ -130,8 +130,17 @@ fn main() {
             }
         }
         Some("serve") => {
-            let eng = load_engine(&fl, pos.get(1).unwrap_or_else(|| die(USAGE)));
-            serve::serve(eng, &get("addr", "0.0.0.0:8000")).unwrap_or_else(|e| die(e));
+            let art = pos.get(1).unwrap_or_else(|| die(USAGE));
+            let eng = load_engine(&fl, art);
+            let up = fl.get("upstream").map(|u| {
+                // re-temper upstream (Laya) probabilities with the calibration refit at compile time
+                let t = Artifact::load(art).unwrap_or_else(|e| die(e)).header.meta["teacher"].clone();
+                let nq = eng.schema.questions.len();
+                let f = |k: &str, j: usize| t[k][j].as_f64().unwrap_or(1.0) as f32;
+                let recal = (0..nq).map(|j| f("shipped_temperature", j) / f("temperature", j)).collect();
+                cascade::Tier::Upstream { url: u.clone(), recal, key: std::env::var("J3V_UPSTREAM_KEY").ok() }
+            });
+            serve::serve(eng, up, &get("addr", "0.0.0.0:8000")).unwrap_or_else(|e| die(e));
         }
         Some("bench") => {
             let t = Instant::now();

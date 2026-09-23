@@ -83,6 +83,27 @@ impl Engine {
         Scored { probs, n_tokens: n }
     }
 
+    /// One answer in Laya's shape plus `j3v: {p_top, escalate, tier}`. `local` = answered by this tier (may escalate).
+    pub fn render(&self, j: usize, p: &[f32], tier: &str, local: bool) -> Value {
+        let q = &self.schema.questions[j];
+        let top = argmax(p);
+        let p_top = p[top] as f64;
+        let ext = json!({"p_top": r4(p_top), "escalate": local && p_top < self.threshold, "tier": tier});
+        let probs: Map<String, Value> = q.options.iter().zip(p).map(|(o, &v)| (o.key.clone(), json!(r4(v as f64)))).collect();
+        match q.qtype {
+            QType::Choice => json!({"type": "choice", "choice": q.options[top].key, "probabilities": probs,
+                                    "confidence": r4(entropy_confidence(p)), "j3v": ext}),
+            QType::Score => {
+                let e: f64 = p.iter().enumerate().map(|(i, &v)| i as f64 * v as f64).sum();
+                let legend: Map<String, Value> =
+                    q.options.iter().map(|o| (o.key.clone(), json!(o.description.clone().unwrap_or_default()))).collect();
+                json!({"type": "score", "score": r4(e), "legend": legend, "probabilities": probs,
+                       "confidence": r4(entropy_confidence(p)), "j3v": ext})
+            }
+            QType::Noul => json!({"type": "noul", "noul": r4(p[1] as f64), "j3v": ext}),
+        }
+    }
+
     /// Answer a Laya/Jev request body. `questions` may be omitted (answer the whole schema) or must be a
     /// subset of the compiled schema with identical definitions: J3v cannot answer questions it was not
     /// compiled for, and says so instead of guessing.
@@ -121,26 +142,9 @@ impl Engine {
         let mut answers = Map::new();
         let mut escalate = false;
         for j in wanted {
-            let (q, p) = (&self.schema.questions[j], &s.probs[j]);
-            let top = argmax(p);
-            let p_top = p[top] as f64;
-            let esc = p_top < self.threshold;
-            escalate |= esc;
-            let ext = json!({"p_top": r4(p_top), "escalate": esc});
-            let probs: Map<String, Value> = q.options.iter().zip(p).map(|(o, &v)| (o.key.clone(), json!(r4(v as f64)))).collect();
-            let a = match q.qtype {
-                QType::Choice => json!({"type": "choice", "choice": q.options[top].key, "probabilities": probs,
-                                        "confidence": r4(entropy_confidence(p)), "j3v": ext}),
-                QType::Score => {
-                    let e: f64 = p.iter().enumerate().map(|(i, &v)| i as f64 * v as f64).sum();
-                    let legend: Map<String, Value> =
-                        q.options.iter().map(|o| (o.key.clone(), json!(o.description.clone().unwrap_or_default()))).collect();
-                    json!({"type": "score", "score": r4(e), "legend": legend, "probabilities": probs,
-                           "confidence": r4(entropy_confidence(p)), "j3v": ext})
-                }
-                QType::Noul => json!({"type": "noul", "noul": r4(p[1] as f64), "j3v": ext}),
-            };
-            answers.insert(q.id.clone(), a);
+            let a = self.render(j, &s.probs[j], "pi", true);
+            escalate |= a["j3v"]["escalate"].as_bool().unwrap_or(false);
+            answers.insert(self.schema.questions[j].id.clone(), a);
         }
         Ok(json!({"model": self.model, "answers": answers, "escalate": escalate,
                   "usage": {"input_tokens": s.n_tokens, "output_tokens": 0}}))
