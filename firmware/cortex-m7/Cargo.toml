@@ -1,0 +1,25 @@
+[package]
+name = "j3v-fw-cortex-m7"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "J3v mcu-tier demo firmware (Cortex-M7: STM32H743 or QEMU mps2-an500)"
+
+[workspace]
+
+[dependencies]
+j3v-mcu = { path = "../../crates/j3v-mcu" }
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+cortex-m-semihosting = "0.5"
+panic-semihosting = { version = "0.6", features = ["exit"] }
+
+[features]
+default = []
+stm32h743 = []
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+debug = false
