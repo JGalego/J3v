@@ -3,12 +3,19 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # manual release: creates the tag on the dispatched commit (for pushers that cannot push tags)
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "tag to create and release, e.g. v0.1.0"
+        required: true
 
 permissions:
   contents: write
 
 env:
   CARGO_TERM_COLOR: always
+  TAG: ${{ inputs.tag || github.ref_name }}
   MINILM: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41
 
 jobs:
@@ -28,7 +35,7 @@ jobs:
       - run: cargo build --release --locked --target ${{ matrix.target }} -p j3v
       - name: package
         run: |
-          n=j3v-${GITHUB_REF_NAME}-${{ matrix.target }}
+          n=j3v-${TAG}-${{ matrix.target }}
           mkdir $n && cp target/${{ matrix.target }}/release/j3v LICENSE README.md $n/
           tar czf $n.tar.gz $n
       - uses: actions/upload-artifact@v4
@@ -77,10 +84,13 @@ jobs:
       - name: checksums and notes
         run: |
           (cd dist && sha256sum * > SHA256SUMS)
-          v=${GITHUB_REF_NAME#v}
+          v=${TAG#v}
           awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
           test -s notes.md
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ env.TAG }}
+          target_commitish: ${{ github.sha }}
+          name: J3v ${{ env.TAG }}
           body_path: notes.md
           files: dist/*
