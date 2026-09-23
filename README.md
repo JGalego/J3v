@@ -10,12 +10,10 @@
 </p>
 
 <p align="center">
-
-[![CI](https://github.com/JGalego/J3v/actions/workflows/ci.yml/badge.svg)](https://github.com/JGalego/J3v/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org)
-[![Targets](https://img.shields.io/badge/targets-pi%20%7C%20mcu-green.svg)](#architecture)
-
+  <a href="https://github.com/JGalego/J3v/actions/workflows/ci.yml"><img src="https://github.com/JGalego/J3v/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-stable-orange.svg" alt="Rust"></a>
+  <a href="#architecture"><img src="https://img.shields.io/badge/targets-pi%20%7C%20mcu-green.svg" alt="Targets"></a>
 </p>
 
 J3v is a **compiler**. You give it a schema of typed questions (`choice`, `score`, `noul`) and their allowed
