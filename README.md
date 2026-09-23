@@ -15,45 +15,24 @@ flash/RAM budget. It returns calibrated probabilities, never text, and speaks La
 ## Getting Started
 
 ```bash
-cargo build --release                         # j3v: compiler driver + pi runtime (one binary)
-pip install torch transformers safetensors huggingface_hub   # compile time only
+cargo install --path crates/j3v
+pip install -r compiler/requirements.txt   # compile time only
 
-# shared int8 encoder for the pi target
-./target/release/j3v encoder import path/to/all-MiniLM-L6-v2 -o minilm.j3a
-
-# states to distill on (JSONL: {"id", "state", "labels"?}); the example uses the Bitext support corpus
-python3 examples/support_triage/prepare.py bitext.csv states.jsonl 8000
-
-# compile for a Raspberry Pi-class device, then for a microcontroller with a 512 KB flash budget
-./target/release/j3v compile schemas/support_triage.j3v --target pi  --encoder minilm.j3a --states states.jsonl -o triage.pi.j3a
-./target/release/j3v compile schemas/support_triage.j3v --target mcu --budget 512KB       --states states.jsonl -o triage.mcu.j3a
-
-# serve (Laya/Jev-compatible)
-./target/release/j3v serve --encoder minilm.j3a triage.pi.j3a --addr 0.0.0.0:8000
-curl -s localhost:8000/v1/systemone -d '{"state": {"message": "I was charged twice, refund me"}}'
+j3v compile schemas/support_triage.j3v --target pi --encoder minilm.j3a --states states.jsonl -o triage.j3a
+j3v serve triage.j3a --encoder minilm.j3a
 ```
 
-A schema:
+A schema declares questions, a confidence threshold for escalation, and the bounds the artifact must meet:
 
 ```text
 schema support_triage
-teacher laya
-
 choice department "Which department should handle this request?"
   billing  "invoices, payments, refunds"
   shipping "delivery times, addresses"
-score urgency "How urgent is this request?"
-  "not urgent"
-  "critical"
 noul refund_requested "Does the user ask to get their money back?"
-
-threshold 0.80            # below this calibrated p_top, escalate to the next tier
-require agreement >= 0.85 # checked against 95% bootstrap bounds on held-out states
+threshold 0.80
 require ece <= 0.05
 ```
-
-Static builds: `cargo build --release --target aarch64-unknown-linux-musl` (~1 MB, no C toolchain needed).
-Firmware: see [`firmware/cortex-m7`](firmware/cortex-m7) (STM32H743 / QEMU `mps2-an500`).
 
 ## Architecture
 
