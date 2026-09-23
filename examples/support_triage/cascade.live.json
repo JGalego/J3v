@@ -4,7 +4,12 @@
   "tiers": [
     {
       "tier": "mcu",
-      "threshold": 0.800000011920929,
+      "threshold": [
+        0.800000011920929,
+        0.6000000238418579,
+        0.800000011920929,
+        0.800000011920929
+      ],
       "questions": [
         {
           "id": "department",
@@ -61,12 +66,17 @@
           }
         }
       ],
-      "latency_ms_p50": 0.004220000000000001,
-      "latency_ms_p95": 0.005366999999999999
+      "latency_ms_p50": 0.004742,
+      "latency_ms_p95": 0.005621999999999999
     },
     {
       "tier": "pi",
-      "threshold": 0.8,
+      "threshold": [
+        0.8,
+        0.6,
+        0.8,
+        0.8
+      ],
       "questions": [
         {
           "id": "department",
@@ -78,9 +88,9 @@
             "n": 300
           },
           "ece": {
-            "value": 0.03331374367078145,
-            "lo": 0.027362846235434213,
-            "hi": 0.0578061259786288,
+            "value": 0.033241410752137504,
+            "lo": 0.02758255869150162,
+            "hi": 0.0576532793045044,
             "n": 300
           }
         },
@@ -100,9 +110,9 @@
             "n": 300
           },
           "ece": {
-            "value": 0.015775331656138102,
-            "lo": 0.013462812701861063,
-            "hi": 0.030985326766967778,
+            "value": 0.015855308969815574,
+            "lo": 0.01324182947476705,
+            "hi": 0.030956633687019352,
             "n": 300
           }
         },
@@ -116,19 +126,24 @@
             "n": 300
           },
           "ece": {
-            "value": 0.02969398101170858,
-            "lo": 0.026774429082870487,
-            "hi": 0.06012613395849864,
+            "value": 0.034146867394447326,
+            "lo": 0.030272143284479774,
+            "hi": 0.06484005769093831,
             "n": 300
           }
         }
       ],
-      "latency_ms_p50": 10.412104,
-      "latency_ms_p95": 15.896482
+      "latency_ms_p50": 10.374985,
+      "latency_ms_p95": 16.326964
     },
     {
       "tier": "laya@http://127.0.0.1:8001",
-      "threshold": null,
+      "threshold": [
+        null,
+        null,
+        null,
+        null
+      ],
       "questions": [
         {
           "id": "department",
@@ -185,8 +200,8 @@
           }
         }
       ],
-      "latency_ms_p50": 704.605494,
-      "latency_ms_p95": 862.3685859999999
+      "latency_ms_p50": 733.761529,
+      "latency_ms_p95": 864.119318
     }
   ],
   "conditional_calibration": [
@@ -208,16 +223,16 @@
     {
       "tier": "pi",
       "temperature": [
-        1.1323295831680298,
+        1.1309868097305298,
+        2.0453646183013916,
         1.0,
-        1.0,
-        1.4385980367660522
+        1.4373102188110352
       ],
       "note": [
-        "refit on 34 escalated calib states",
-        "kept marginal: only 0 labelled escalated calib states",
-        "kept marginal: only 12 labelled escalated calib states",
-        "refit on 34 escalated calib states"
+        "refit on 34 escalated calib states vs ground truth",
+        "refit on 35 escalated calib states vs final-tier answers",
+        "kept marginal: only 12 escalated calib states with a target",
+        "refit on 34 escalated calib states vs ground truth"
       ]
     },
     {
@@ -229,10 +244,10 @@
         1.0
       ],
       "note": [
-        "kept marginal: only 28 labelled escalated calib states",
-        "kept marginal: only 0 labelled escalated calib states",
-        "kept marginal: only 7 labelled escalated calib states",
-        "kept marginal: only 29 labelled escalated calib states"
+        "kept marginal: only 28 escalated calib states with a target",
+        "kept marginal: only 0 escalated calib states with a target",
+        "kept marginal: only 7 escalated calib states with a target",
+        "kept marginal: only 29 escalated calib states with a target"
       ]
     }
   ],
@@ -246,22 +261,25 @@
           "answered": 269,
           "share": 0.8966666666666666,
           "labelled": 269,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9739776951672863,
           "accuracy_on_kept_hi": 0.9858314086356945
         },
         {
           "id": "urgency",
-          "answered": 193,
-          "share": 0.6433333333333333,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 267,
+          "share": 0.89,
+          "labelled": 267,
+          "target": "final tier",
+          "accuracy_on_kept": 0.8726591760299626,
+          "accuracy_on_kept_hi": 0.9025196770853081
         },
         {
           "id": "refund_requested",
           "answered": 294,
           "share": 0.98,
           "labelled": 294,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9897959183673469,
           "accuracy_on_kept_hi": 0.995915106181531
         },
@@ -270,6 +288,7 @@
           "answered": 257,
           "share": 0.8566666666666667,
           "labelled": 257,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9688715953307393,
           "accuracy_on_kept_hi": 0.9823740798330466
         }
@@ -277,29 +296,32 @@
     },
     {
       "tier": "pi",
-      "requests_reaching_tier": 159,
+      "requests_reaching_tier": 104,
       "questions": [
         {
           "id": "department",
           "answered": 7,
           "share": 0.023333333333333334,
           "labelled": 7,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.8571428571428571,
           "accuracy_on_kept_hi": 0.9674599191386258
         },
         {
           "id": "urgency",
-          "answered": 45,
-          "share": 0.15,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 21,
+          "share": 0.07,
+          "labelled": 21,
+          "target": "final tier",
+          "accuracy_on_kept": 0.9047619047619048,
+          "accuracy_on_kept_hi": 0.9679694763798452
         },
         {
           "id": "refund_requested",
           "answered": 3,
           "share": 0.01,
           "labelled": 3,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6666666666666666,
           "accuracy_on_kept_hi": 0.9217433845207598
         },
@@ -308,6 +330,7 @@
           "answered": 16,
           "share": 0.05333333333333334,
           "labelled": 16,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9375,
           "accuracy_on_kept_hi": 0.985932544541356
         }
@@ -315,21 +338,23 @@
     },
     {
       "tier": "laya@http://127.0.0.1:8001",
-      "requests_reaching_tier": 107,
+      "requests_reaching_tier": 65,
       "questions": [
         {
           "id": "department",
           "answered": 24,
           "share": 0.08,
           "labelled": 24,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.5,
           "accuracy_on_kept_hi": 0.6591590290299569
         },
         {
           "id": "urgency",
-          "answered": 62,
-          "share": 0.20666666666666667,
+          "answered": 12,
+          "share": 0.04,
           "labelled": 0,
+          "target": "final tier",
           "accuracy_on_kept": null,
           "accuracy_on_kept_hi": 1.0
         },
@@ -338,6 +363,7 @@
           "answered": 3,
           "share": 0.01,
           "labelled": 3,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6666666666666666,
           "accuracy_on_kept_hi": 0.9217433845207598
         },
@@ -346,6 +372,7 @@
           "answered": 27,
           "share": 0.09,
           "labelled": 27,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6296296296296297,
           "accuracy_on_kept_hi": 0.7640473657586655
         }
@@ -364,22 +391,25 @@
           "answered": 269,
           "share": 0.8966666666666666,
           "labelled": 269,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9739776951672863,
           "accuracy_on_kept_hi": 0.9858314086356945
         },
         {
           "id": "urgency",
-          "answered": 193,
-          "share": 0.6433333333333333,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 267,
+          "share": 0.89,
+          "labelled": 267,
+          "target": "final tier",
+          "accuracy_on_kept": 0.8726591760299626,
+          "accuracy_on_kept_hi": 0.9025196770853081
         },
         {
           "id": "refund_requested",
           "answered": 294,
           "share": 0.98,
           "labelled": 294,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9897959183673469,
           "accuracy_on_kept_hi": 0.995915106181531
         },
@@ -388,6 +418,7 @@
           "answered": 257,
           "share": 0.8566666666666667,
           "labelled": 257,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9688715953307393,
           "accuracy_on_kept_hi": 0.9823740798330466
         }
@@ -395,29 +426,32 @@
     },
     {
       "tier": "pi",
-      "requests_reaching_tier": 159,
+      "requests_reaching_tier": 104,
       "questions": [
         {
           "id": "department",
           "answered": 6,
           "share": 0.02,
           "labelled": 6,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.8333333333333334,
           "accuracy_on_kept_hi": 0.9618987960475042
         },
         {
           "id": "urgency",
-          "answered": 45,
-          "share": 0.15,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 10,
+          "share": 0.03333333333333333,
+          "labelled": 10,
+          "target": "final tier",
+          "accuracy_on_kept": 0.9,
+          "accuracy_on_kept_hi": 0.9773676701599938
         },
         {
           "id": "refund_requested",
           "answered": 3,
           "share": 0.01,
           "labelled": 3,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6666666666666666,
           "accuracy_on_kept_hi": 0.9217433845207598
         },
@@ -426,6 +460,7 @@
           "answered": 11,
           "share": 0.03666666666666667,
           "labelled": 11,
+          "target": "ground-truth",
           "accuracy_on_kept": 1.0,
           "accuracy_on_kept_hi": 1.0
         }
@@ -433,21 +468,23 @@
     },
     {
       "tier": "laya@http://127.0.0.1:8001",
-      "requests_reaching_tier": 112,
+      "requests_reaching_tier": 81,
       "questions": [
         {
           "id": "department",
           "answered": 25,
           "share": 0.08333333333333333,
           "labelled": 25,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.52,
           "accuracy_on_kept_hi": 0.6741941277321708
         },
         {
           "id": "urgency",
-          "answered": 62,
-          "share": 0.20666666666666667,
+          "answered": 23,
+          "share": 0.07666666666666666,
           "labelled": 0,
+          "target": "final tier",
           "accuracy_on_kept": null,
           "accuracy_on_kept_hi": 1.0
         },
@@ -456,6 +493,7 @@
           "answered": 3,
           "share": 0.01,
           "labelled": 3,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6666666666666666,
           "accuracy_on_kept_hi": 0.9217433845207598
         },
@@ -464,6 +502,7 @@
           "answered": 32,
           "share": 0.10666666666666667,
           "labelled": 32,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.65625,
           "accuracy_on_kept_hi": 0.7772487780975667
         }
@@ -471,7 +510,7 @@
     }
   ],
   "cascade_accuracy": 0.9511111111111111,
-  "expected_latency_ms": 268.57535288,
+  "expected_latency_ms": 201.71701629666666,
   "passed": true,
   "failures": []
 }

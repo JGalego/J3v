@@ -50,6 +50,7 @@ wait states. The same firmware reports cycles when flashed to a board.
   Laya is reached by 25% of requests (36% before per-question thresholds). Cascade accuracy 0.950. Laya is *less* accurate than the
   students on what reaches it (0.44–0.64), because those states are the ambiguous ones. On this data the cascade
   buys compute, not accuracy.
-- **Live (300 test states, `laya-serve` on CPU; measured before per-question thresholds):** contract holds. After re-tempering, Laya's ECE is 0.014–0.030.
-  Cascade accuracy 0.951, expected latency 269 ms/request, dominated by Laya's 705 ms. `j3v serve --upstream` does the
-  same escalation at runtime, per question.
+- **Live (300 test states, `laya-serve` on CPU):** contract holds. After re-tempering, Laya's ECE is 0.014–0.030.
+  27% of requests reach Laya (37% before per-question thresholds). Cascade accuracy 0.951, expected latency
+  **202 ms/request** (269 ms before), dominated by Laya's 734 ms p50. `j3v serve --upstream` does the same escalation
+  at runtime, per question.
