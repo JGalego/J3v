@@ -131,9 +131,12 @@ jobs:
           cargo build --release
       - name: run in QEMU and compare with the host runtime
         run: |
-          timeout 120 qemu-system-arm -cpu cortex-m7 -machine mps2-an500 -nographic \
+          # -icount shift=0: one instruction per virtual ns, so the firmware's SysTick bench counts instructions
+          timeout 300 qemu-system-arm -cpu cortex-m7 -machine mps2-an500 -nographic -icount shift=0 \
             -semihosting-config enable=on,target=native \
             -kernel firmware/cortex-m7/target/thumbv7em-none-eabihf/release/j3v-fw-cortex-m7 > qemu.txt
           ./target/release/j3v mcu-predict examples/support_triage/support_triage.mcu.j3a firmware/cortex-m7/src/inputs.txt > host.txt
           cat qemu.txt
-          diff host.txt qemu.txt
+          diff host.txt <(grep -v '^#' qemu.txt)
+          { echo "### mcu firmware (Cortex-M7, QEMU -icount)"; grep '^#' qemu.txt | sed 's/^# /- /'; \
+            echo "- flash: $(size -A firmware/cortex-m7/target/thumbv7em-none-eabihf/release/j3v-fw-cortex-m7 | awk '/^.text|^.rodata/ {s+=$2} END {print s}') bytes (.text + .rodata)"; } >> $GITHUB_STEP_SUMMARY
