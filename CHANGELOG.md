@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- Static 32-bit ARM build (`armv7-unknown-linux-musleabihf`) for Raspberry Pis running a 32-bit OS. It uses the
+  portable int8 kernel, which is slower than the aarch64 dot-product kernel.
+
 ## [0.1.0] - 2026-09-23
 
 First release. J3v compiles typed decision schemas into calibrated, edge-sized artifacts distilled from
