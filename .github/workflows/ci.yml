@@ -62,7 +62,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: art
-        run: echo "ok=$([ -f examples/support_triage/support_triage.pi.j3a ] && echo 1 || echo 0)" >> $GITHUB_OUTPUT
+        name: certified pi artifact present?
+        run: |
+          if [ -f examples/support_triage/support_triage.pi.j3a ]; then echo "ok=1" >> $GITHUB_OUTPUT; else
+            echo "ok=0" >> $GITHUB_OUTPUT
+            echo "::warning title=ARM bench skipped::examples/support_triage/support_triage.pi.j3a is not committed yet; build/predict/bench steps were skipped"
+          fi
       - uses: dtolnay/rust-toolchain@stable
         if: steps.art.outputs.ok == '1'
         with:
