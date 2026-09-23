@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.1.1] - 2026-09-23
 
 ### Added
 - Static 32-bit ARM build (`armv7-unknown-linux-musleabihf`) for Raspberry Pis running a 32-bit OS. It uses the
