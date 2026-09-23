@@ -53,3 +53,54 @@ jobs:
         with:
           name: j3v-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/j3v
+
+  arm:
+    name: pi runtime on native ARM64 (latency)
+    runs-on: ubuntu-24.04-arm
+    env:
+      MINILM: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+    steps:
+      - uses: actions/checkout@v4
+      - id: art
+        run: echo "ok=$([ -f examples/support_triage/support_triage.pi.j3a ] && echo 1 || echo 0)" >> $GITHUB_OUTPUT
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.art.outputs.ok == '1'
+        with:
+          targets: aarch64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        if: steps.art.outputs.ok == '1'
+        with:
+          key: arm64
+      - name: build the static binary that ships to the Pi
+        if: steps.art.outputs.ok == '1'
+        run: cargo build --release --target aarch64-unknown-linux-musl -p j3v
+      - uses: actions/cache@v4
+        if: steps.art.outputs.ok == '1'
+        with:
+          path: minilm.j3a
+          key: minilm-1110a243-int8-${{ hashFiles('crates/j3v/src/encoder.rs') }}
+      - name: import the shared int8 encoder
+        if: steps.art.outputs.ok == '1'
+        run: |
+          [ -f minilm.j3a ] && exit 0
+          mkdir -p hf && for f in model.safetensors config.json vocab.txt tokenizer_config.json; do curl -sSfL "$MINILM/$f" -o hf/$f; done
+          target/aarch64-unknown-linux-musl/release/j3v encoder import hf -o minilm.j3a sentence-transformers/all-MiniLM-L6-v2@1110a243
+      - name: predict
+        if: steps.art.outputs.ok == '1'
+        run: |
+          target/aarch64-unknown-linux-musl/release/j3v predict --encoder minilm.j3a examples/support_triage/support_triage.pi.j3a \
+            '{"state": {"message": "I was charged twice, please refund me"}}'
+      - name: bench (1 core, 1 thread; Pi 5 is a Cortex-A76, this runner is a newer Neoverse core, so treat as a lower bound)
+        if: steps.art.outputs.ok == '1'
+        run: |
+          J=target/aarch64-unknown-linux-musl/release/j3v
+          lscpu | grep -E "Model name|^CPU\(s\)" || true
+          taskset -c 0 $J bench --encoder minilm.j3a examples/support_triage/support_triage.pi.j3a examples/support_triage/bench.jsonl --n 1000 --threads 1 | tee bench.json
+          python3 - <<'PY' >> $GITHUB_STEP_SUMMARY
+          import json, os
+          b = json.load(open("bench.json"))
+          size = os.path.getsize("target/aarch64-unknown-linux-musl/release/j3v")
+          print("### pi runtime on ARM64 (%s kernel)" % b["kernel"])
+          print("| binary | questions | mean tokens | p50 ms | p95 ms | p99 ms |\n|---|---|---|---|---|---|")
+          print("| %.2f MB | %d | %.1f | %.2f | %.2f | %.2f |" % (size / 1e6, b["questions"], b["mean_tokens"], b["p50_ms"], b["p95_ms"], b["p99_ms"]))
+          PY

@@ -1,0 +1,24 @@
+{"id": "bench-00", "state": {"message": "I was charged twice for my order, please refund the duplicate"}}
+{"id": "bench-01", "state": {"message": "where is my package? it was supposed to arrive yesterday"}}
+{"id": "bench-02", "state": {"message": "can I talk to a real person please"}}
+{"id": "bench-03", "state": {"message": "how do I change the email address on my account"}}
+{"id": "bench-04", "state": {"message": "I forgot my password and cannot log in"}}
+{"id": "bench-05", "state": {"message": "cancel order #48213 right now"}}
+{"id": "bench-06", "state": {"message": "what payment methods do you accept"}}
+{"id": "bench-07", "state": {"message": "I want to unsubscribe from the newsletter"}}
+{"id": "bench-08", "state": {"message": "the delivery address on my order is wrong, can you update it"}}
+{"id": "bench-09", "state": {"message": "your app is great, five stars"}}
+{"id": "bench-10", "state": {"message": "this is the third time I'm complaining about late deliveries, I'm done"}}
+{"id": "bench-11", "state": {"message": "how long does shipping to Portugal take"}}
+{"id": "bench-12", "state": {"message": "I need a copy of invoice INV-2231 for my accountant"}}
+{"id": "bench-13", "state": {"message": "my card was declined but the money left my bank"}}
+{"id": "bench-14", "state": {"message": "can you help me create a business account"}}
+{"id": "bench-15", "state": {"message": "I'd like my money back for the broken blender"}}
+{"id": "bench-16", "state": {"message": "what's the fee if I cancel my subscription"}}
+{"id": "bench-17", "state": {"message": "is there express delivery?"}}
+{"id": "bench-18", "state": {"message": "switch my account to the premium plan"}}
+{"id": "bench-19", "state": {"message": "I never received the refund you promised last week"}}
+{"id": "bench-20", "state": {"message": "please delete my account and all my data"}}
+{"id": "bench-21", "state": {"message": "give me a human agent, the bot is useless"}}
+{"id": "bench-22", "state": {"message": "add a second item to my order before it ships"}}
+{"id": "bench-23", "state": {"message": "what is your refund policy for opened items"}}
