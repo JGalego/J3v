@@ -109,3 +109,31 @@ jobs:
           print("| binary | questions | mean tokens | p50 ms | p95 ms | p99 ms |\n|---|---|---|---|---|---|")
           print("| %.2f MB | %d | %.1f | %.2f | %.2f | %.2f |" % (size / 1e6, b["questions"], b["mean_tokens"], b["p50_ms"], b["p95_ms"], b["p99_ms"]))
           PY
+  firmware:
+    name: mcu firmware (Cortex-M7, QEMU)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ". -> target\nfirmware/cortex-m7 -> target"
+      - run: sudo apt-get update -q && sudo apt-get install -y -q qemu-system-arm
+      - run: cargo build --release -p j3v
+      - name: generate firmware model from the committed mcu artifact
+        run: ./target/release/j3v mcu-codegen examples/support_triage/support_triage.mcu.j3a -o firmware/cortex-m7/src/model.rs
+      - name: build firmware (QEMU mps2-an500 and STM32H743 memory maps)
+        working-directory: firmware/cortex-m7
+        run: |
+          cargo build --release --features stm32h743
+          cargo build --release
+      - name: run in QEMU and compare with the host runtime
+        run: |
+          timeout 120 qemu-system-arm -cpu cortex-m7 -machine mps2-an500 -nographic \
+            -semihosting-config enable=on,target=native \
+            -kernel firmware/cortex-m7/target/thumbv7em-none-eabihf/release/j3v-fw-cortex-m7 > qemu.txt
+          ./target/release/j3v mcu-predict examples/support_triage/support_triage.mcu.j3a firmware/cortex-m7/src/inputs.txt > host.txt
+          cat qemu.txt
+          diff host.txt qemu.txt
