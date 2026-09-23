@@ -203,16 +203,23 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
             budget.ram.map_or(String::new(), |r| format!(", {} RAM", kb(r)))
         ));
     }
-    // train the largest few that fit (spread over sizes), certify each, ship the smallest that passes
+    // for each embedding width, train the largest bucket count that fits and one 4x smaller; certify each and ship
+    // the smallest that passes
     let mut pick: Vec<(Cand, usize, usize)> = Vec::new();
-    for x in fits.iter().rev() {
-        if pick.len() >= 4 {
-            break;
-        }
-        if pick.iter().all(|p| p.1 as f64 > x.1 as f64 * 1.8) {
-            pick.push(*x);
+    for dim in [16usize, 32, 64] {
+        let mut same: Vec<_> = fits.iter().copied().filter(|x| x.0.dim == dim && x.0.hidden == 64).collect();
+        same.sort_by_key(|x| x.0.buckets);
+        if let Some(&big) = same.last() {
+            pick.push(big);
+            if let Some(&small) = same.iter().find(|x| x.0.buckets * 4 == big.0.buckets) {
+                pick.push(small);
+            }
         }
     }
+    if pick.is_empty() {
+        pick.push(*fits.last().unwrap());
+    }
+    pick.sort_by_key(|x| x.1);
     let p: Prepared = prepare(o, schema)?;
     let schema = &p.schema;
     let fpath = p.bdir.join(format!("mcu-feats-{}.json", &p.states_hash[..8]));
@@ -244,8 +251,8 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
     let texts: Vec<String> = p.rows.iter().map(|r| state_text(&r.state)).collect();
     let nq = schema.questions.len();
     let mut tried = Vec::new();
-    let mut best: Option<(Owned, Value, Vec<String>)> = None;
-    for ((c, flash, ram), cj) in pick.iter().zip(&cands).rev() {
+    let mut best: Option<(Owned, Value, Vec<String>, f64)> = None;
+    for ((c, flash, ram), cj) in pick.iter().zip(&cands) {
         let draft = Artifact::load(cj["out"].as_str().unwrap())?;
         let mut om = Owned::from_draft(&draft, *c, nq)?;
         let run = |ix: &[usize]| -> Vec<Vec<Vec<f32>>> {
@@ -275,18 +282,22 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
         );
         tried.push(summary);
         let passed = failures.is_empty();
+        let mean_agree = reports.iter().map(|r| r.agreement.value).sum::<f64>() / reports.len() as f64;
+        // on total failure, report the candidate closest to passing: fewest failed bounds, then highest agreement
         let better = match &best {
             None => true,
-            Some((_, _, bf)) => !bf.is_empty() && (passed || failures.len() < bf.len()),
+            Some((_, _, bf, ba)) => {
+                !bf.is_empty() && (passed || failures.len() < bf.len() || (failures.len() == bf.len() && mean_agree > *ba))
+            }
         };
         if better {
-            best = Some((om, json!(reports), failures));
+            best = Some((om, json!(reports), failures, mean_agree));
         }
         if passed {
             break; // smallest passing size (candidates are visited small -> large)
         }
     }
-    let (om, reports, failures) = best.unwrap();
+    let (om, reports, failures, _) = best.unwrap();
     let mut report = report_base(o, &p, t0);
     report["model"] = json!({"buckets": om.c.buckets, "dim": om.c.dim, "hidden": om.c.hidden, "max_bytes": MAX_BYTES,
                              "flash_bytes": om.flash_bytes(), "ram_bytes": m::ram_bytes(om.c.dim, om.c.hidden, nq)});

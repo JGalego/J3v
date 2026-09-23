@@ -8,7 +8,7 @@ use crate::encoder::{quantize_rows, Encoder};
 use crate::engine::Engine;
 use crate::mcu;
 use j3v_core::artifact::Artifact;
-use j3v_core::metrics::{accuracy_est, argmax, ece_est, fit_temperature, softmax_t, Est};
+use j3v_core::metrics::{accuracy_est, argmax, bootstrap, ece_est, fit_temperature, softmax_t, Est};
 use j3v_core::schema::{fnv1a64, from_laya_json, parse_dsl, state_text, QType, Schema};
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -99,7 +99,7 @@ pub struct QReport {
     pub teacher_accuracy_gt: Option<Est>,
     pub teacher_ece_gt: Option<Est>,
     pub mean_tv_to_teacher: f64,
-    pub score_mae_to_teacher: Option<f64>,
+    pub score_mae_to_teacher: Option<Est>,
     pub selective: Selective,
 }
 
@@ -318,7 +318,8 @@ pub fn certify(p: &Prepared, zc: &[Vec<Vec<f32>>], zt: &[Vec<Vec<f32>>]) -> (Vec
                 / test.len() as f64;
         let score_mae = (q.qtype == QType::Score).then(|| {
             let ev = |p: &[f32]| p.iter().enumerate().map(|(i, &v)| i as f64 * v as f64).sum::<f64>();
-            test.iter().zip(&ps).map(|(&i, p)| (ev(p) - ev(&tp[i])).abs()).sum::<f64>() / test.len() as f64
+            let err: Vec<f64> = test.iter().zip(&ps).map(|(&i, p)| (ev(p) - ev(&tp[i])).abs()).collect();
+            bootstrap(err.len(), 1000, seed, |ix| ix.iter().map(|&i| err[i]).sum::<f64>() / ix.len() as f64)
         });
         let kept: Vec<usize> = (0..test.len()).filter(|&r| conf[r] >= schema.threshold).collect();
         let selective = Selective {
@@ -346,22 +347,34 @@ pub fn certify(p: &Prepared, zc: &[Vec<Vec<f32>>], zt: &[Vec<Vec<f32>>]) -> (Vec
             selective,
         };
         // the gate: bounds are checked against one-sided 95% bootstrap limits
-        let rq = &schema.require;
-        if r.agreement.lo < rq.agreement {
-            failures.push(format!(
-                "question `{}`: agreement with teacher {:.3} (95% lower bound {:.3}) < required {:.3}",
-                q.id, r.agreement.value, r.agreement.lo, rq.agreement
-            ));
+        let rq = schema.require.for_question(&q.id);
+        if let Some(min) = rq.agreement {
+            if r.agreement.lo < min {
+                failures.push(format!(
+                    "question `{}`: agreement with teacher {:.3} (95% lower bound {:.3}) < required {:.3}",
+                    q.id, r.agreement.value, r.agreement.lo, min
+                ));
+            }
         }
-        if r.ece.hi > rq.ece {
-            failures.push(format!(
-                "question `{}`: ECE vs {} {:.4} (95% upper bound {:.4}) > allowed {:.4}",
-                q.id, r.calibration_target, r.ece.value, r.ece.hi, rq.ece
-            ));
+        if let Some(max) = rq.ece {
+            if r.ece.hi > max {
+                failures.push(format!(
+                    "question `{}`: ECE vs {} {:.4} (95% upper bound {:.4}) > allowed {:.4}",
+                    q.id, r.calibration_target, r.ece.value, r.ece.hi, max
+                ));
+            }
         }
         if let (Some(min), Some(a)) = (rq.accuracy, &r.accuracy_gt) {
             if a.lo < min {
                 failures.push(format!("question `{}`: accuracy {:.3} (95% lower bound {:.3}) < required {:.3}", q.id, a.value, a.lo, min));
+            }
+        }
+        if let (Some(max), Some(m)) = (rq.mae, &r.score_mae_to_teacher) {
+            if m.hi > max {
+                failures.push(format!(
+                    "question `{}`: expected-score MAE vs teacher {:.3} (95% upper bound {:.3}) > allowed {:.3}",
+                    q.id, m.value, m.hi, max
+                ));
             }
         }
         if r.selective.n > 0 && r.selective.accuracy < schema.threshold {

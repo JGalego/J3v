@@ -55,11 +55,39 @@ pub struct Requirements {
     pub ece: f64,
     /// Optional lower bound on accuracy against ground-truth labels (only for questions that have them).
     pub accuracy: Option<f64>,
+    /// Optional upper bound on |E[score] - E_teacher[score]| for `score` questions (in levels). Argmax agreement is a
+    /// harsh metric for ordinal answers: a teacher split between two adjacent levels makes the argmax a coin flip.
+    #[serde(default)]
+    pub mae: Option<f64>,
+    /// Per-question overrides: `require <question>.<metric> <op> <bound>`.
+    #[serde(default)]
+    pub per_question: std::collections::BTreeMap<String, Bounds>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Bounds {
+    pub agreement: Option<f64>,
+    pub ece: Option<f64>,
+    pub accuracy: Option<f64>,
+    pub mae: Option<f64>,
 }
 
 impl Default for Requirements {
     fn default() -> Self {
-        Requirements { agreement: 0.85, ece: 0.05, accuracy: None }
+        Requirements { agreement: 0.85, ece: 0.05, accuracy: None, mae: None, per_question: Default::default() }
+    }
+}
+
+impl Requirements {
+    /// Bounds in force for one question: its overrides, else the schema-wide values.
+    pub fn for_question(&self, id: &str) -> Bounds {
+        let o = self.per_question.get(id).cloned().unwrap_or_default();
+        Bounds {
+            agreement: o.agreement.or(Some(self.agreement)),
+            ece: o.ece.or(Some(self.ece)),
+            accuracy: o.accuracy.or(self.accuracy),
+            mae: o.mae.or(self.mae),
+        }
     }
 }
 
@@ -87,7 +115,7 @@ impl Schema {
             "teacher": self.teacher,
             "max_state_tokens": self.max_state_tokens,
             "threshold": self.threshold,
-            "require": {"agreement": self.require.agreement, "ece": self.require.ece, "accuracy": self.require.accuracy},
+            "require": serde_json::to_value(&self.require).expect("requirements serialize"),
             "questions": self.questions.iter().map(|q| json!({
                 "id": q.id, "type": q.qtype.name(), "instructions": q.instructions,
                 "options": q.options.iter().map(|o| json!({"key": o.key, "description": o.description})).collect::<Vec<_>>(),
@@ -257,7 +285,7 @@ fn lex_line(line: &str, ln: usize) -> Result<Vec<Spanned>, SchemaError> {
             out.push(Spanned { tok: Tok::Num(v), col });
         } else if c.is_alphabetic() || c == '_' {
             let st = i;
-            while i < cs.len() && (cs[i].is_alphanumeric() || cs[i] == '_' || cs[i] == '-') {
+            while i < cs.len() && (cs[i].is_alphanumeric() || cs[i] == '_' || cs[i] == '-' || cs[i] == '.') {
                 i += 1;
             }
             out.push(Spanned { tok: Tok::Word(cs[st..i].iter().collect()), col });
@@ -300,6 +328,7 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
     let mut questions: Vec<Question> = Vec::new();
     let mut qlines: Vec<usize> = Vec::new();
     let mut in_question = false;
+    let mut scoped: Vec<(String, String, usize, usize)> = Vec::new();
 
     for (idx, raw) in src.lines().enumerate() {
         let ln = idx + 1;
@@ -374,28 +403,47 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
             "require" => {
                 let m = arg(1, "a metric")?;
                 let op = arg(2, "`>=` or `<=`")?;
-                let v = num(arg(3, "a bound")?, 0.0, 1.0)?;
-                end(4)?;
-                let metric = match &m.tok {
-                    Tok::Word(w) => w.as_str(),
+                let full = match &m.tok {
+                    Tok::Word(w) => w.clone(),
                     _ => return Err(SchemaError::new(ln, m.col, "expected a metric name")),
                 };
-                let (want, slot): (&str, &mut f64) = match metric {
-                    "agreement" => (">=", &mut require.agreement),
-                    "ece" => ("<=", &mut require.ece),
-                    "accuracy" => {
-                        require.accuracy = Some(0.0);
-                        (">=", require.accuracy.as_mut().unwrap())
-                    }
-                    _ => {
-                        return Err(SchemaError::new(ln, m.col, format!("unknown metric `{}`", metric))
-                            .help("metrics: agreement (>=), ece (<=), accuracy (>=)"))
-                    }
+                let (qid, metric) = match full.split_once('.') {
+                    Some((q, mt)) => (Some(q.to_string()), mt.to_string()),
+                    None => (None, full.clone()),
                 };
+                let (want, hi) =
+                    match metric.as_str() {
+                        "agreement" | "accuracy" => (">=", 1.0),
+                        "ece" => ("<=", 1.0),
+                        "mae" => ("<=", 1e3),
+                        _ => return Err(SchemaError::new(ln, m.col, format!("unknown metric `{}`", metric)).help(
+                            "metrics: agreement (>=), accuracy (>=), ece (<=), mae (<=, score questions); prefix with `question.` to scope",
+                        )),
+                    };
+                let v = num(arg(3, "a bound")?, 0.0, hi)?;
+                end(4)?;
                 if op.tok != Tok::Op(if want == ">=" { ">=" } else { "<=" }) {
                     return Err(SchemaError::new(ln, op.col, format!("`{}` takes `{}`", metric, want)));
                 }
-                *slot = v;
+                match qid {
+                    None => match metric.as_str() {
+                        "agreement" => require.agreement = v,
+                        "ece" => require.ece = v,
+                        "accuracy" => require.accuracy = Some(v),
+                        _ => require.mae = Some(v),
+                    },
+                    Some(q) => {
+                        scoped.push((q.clone(), metric.clone(), ln, m.col));
+                        let b = require.per_question.entry(q).or_default();
+                        let slot = match metric.as_str() {
+                            "agreement" => &mut b.agreement,
+                            "ece" => &mut b.ece,
+                            "accuracy" => &mut b.accuracy,
+                            _ => &mut b.mae,
+                        };
+                        *slot = Some(v);
+                    }
+                }
             }
             "choice" | "score" | "noul" => {
                 let qtype = match kw.as_str() {
@@ -448,6 +496,18 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
             _ if k > MAX_OPTIONS => {
                 return Err(SchemaError::new(ln, 1, format!("`{}` has {} options; J3v supports at most {}", q.id, k, MAX_OPTIONS))
                     .help("the Laya teacher degrades past ~20 options (Banking77: 0.425); split into a coarse-to-fine pair of questions"))
+            }
+            _ => {}
+        }
+    }
+    for (q, metric, ln, col) in &scoped {
+        match questions.iter().find(|x| &x.id == q) {
+            None => {
+                return Err(SchemaError::new(*ln, *col, format!("`require` names unknown question `{}`", q))
+                    .help(format!("questions: {}", questions.iter().map(|x| x.id.as_str()).collect::<Vec<_>>().join(", "))))
+            }
+            Some(x) if metric == "mae" && x.qtype != QType::Score => {
+                return Err(SchemaError::new(*ln, *col, format!("`mae` only applies to score questions; `{}` is a {}", q, x.qtype.name())))
             }
             _ => {}
         }
@@ -613,6 +673,18 @@ require accuracy >= 0.8
         let v = json!({"name": "triage", "threshold": 0.7, "questions": s.to_laya_questions()});
         let s2 = from_laya_json(&v).unwrap();
         assert_eq!(s.teacher_hash(), s2.teacher_hash());
+    }
+
+    #[test]
+    fn per_question_bounds() {
+        let s = parse_dsl(&format!("{}require urgency.agreement >= 0.8\nrequire urgency.mae <= 0.25\n", SRC)).unwrap();
+        let b = s.require.for_question("urgency");
+        assert_eq!((b.agreement, b.mae, b.ece), (Some(0.8), Some(0.25), Some(0.05)));
+        assert_eq!(s.require.for_question("dept").agreement, Some(0.9));
+        let e = parse_dsl(&format!("{}require dept.mae <= 0.2\n", SRC)).unwrap_err();
+        assert!(e.msg.contains("only applies to score"), "{}", e.msg);
+        let e = parse_dsl(&format!("{}require nope.ece <= 0.2\n", SRC)).unwrap_err();
+        assert!(e.msg.contains("unknown question"), "{}", e.msg);
     }
 
     #[test]
