@@ -1,6 +1,6 @@
 {
   "schema": "support_triage",
-  "schema_hash": "a37cb530059e62f4",
+  "schema_hash": "a619773e2187e7af",
   "target": "mcu",
   "teacher": {
     "name": "laya",
@@ -47,7 +47,10 @@
     }
   },
   "threshold": 0.8,
-  "compile_seconds": 60.989558505,
+  "thresholds": {
+    "urgency": 0.6
+  },
+  "compile_seconds": 64.765773809,
   "model": {
     "buckets": 1024,
     "dim": 64,
@@ -188,10 +191,10 @@
         "n": 1614
       },
       "selective": {
-        "threshold": 0.8,
-        "coverage": 0.6499380421313506,
-        "accuracy": 0.9323164918970448,
-        "n": 1049
+        "threshold": 0.6,
+        "coverage": 0.8897149938042132,
+        "accuracy": 0.8628133704735376,
+        "n": 1436
       }
     },
     {

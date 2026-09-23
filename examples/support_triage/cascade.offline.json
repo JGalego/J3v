@@ -4,7 +4,12 @@
   "tiers": [
     {
       "tier": "mcu",
-      "threshold": 0.800000011920929,
+      "threshold": [
+        0.800000011920929,
+        0.6000000238418579,
+        0.800000011920929,
+        0.800000011920929
+      ],
       "questions": [
         {
           "id": "department",
@@ -61,12 +66,17 @@
           }
         }
       ],
-      "latency_ms_p50": 0.004884,
-      "latency_ms_p95": 0.005519
+      "latency_ms_p50": 0.004543,
+      "latency_ms_p95": 0.005245
     },
     {
       "tier": "pi",
-      "threshold": 0.8,
+      "threshold": [
+        0.8,
+        0.6,
+        0.8,
+        0.8
+      ],
       "questions": [
         {
           "id": "department",
@@ -78,9 +88,9 @@
             "n": 1614
           },
           "ece": {
-            "value": 0.019584865448938723,
-            "lo": 0.01657139030752572,
-            "hi": 0.02990251524740879,
+            "value": 0.01969044831901087,
+            "lo": 0.016405547658602398,
+            "hi": 0.03002619361124074,
             "n": 1614
           }
         },
@@ -100,9 +110,9 @@
             "n": 1614
           },
           "ece": {
-            "value": 0.009830398076528954,
-            "lo": 0.007499440858207522,
-            "hi": 0.01725812014446235,
+            "value": 0.008989156104965871,
+            "lo": 0.00721253748276863,
+            "hi": 0.016828536174849803,
             "n": 1614
           }
         },
@@ -110,25 +120,30 @@
           "id": "wants_human",
           "n_labelled": 1614,
           "accuracy": {
-            "value": 0.9504337050805453,
-            "lo": 0.9411400247831475,
+            "value": 0.949814126394052,
+            "lo": 0.9405204460966543,
             "hi": 0.9591078066914498,
             "n": 1614
           },
           "ece": {
-            "value": 0.01048258046678451,
-            "lo": 0.009569117755547184,
-            "hi": 0.021973722116950128,
+            "value": 0.010630353712828777,
+            "lo": 0.010109267085605986,
+            "hi": 0.022134712489859616,
             "n": 1614
           }
         }
       ],
-      "latency_ms_p50": 11.154262,
-      "latency_ms_p95": 16.879939
+      "latency_ms_p50": 11.009591,
+      "latency_ms_p95": 16.41634
     },
     {
       "tier": "laya(cached)",
-      "threshold": null,
+      "threshold": [
+        null,
+        null,
+        null,
+        null
+      ],
       "questions": [
         {
           "id": "department",
@@ -185,8 +200,8 @@
           }
         }
       ],
-      "latency_ms_p50": 0.000553,
-      "latency_ms_p95": 0.0011510000000000001
+      "latency_ms_p50": 0.000267,
+      "latency_ms_p95": 0.000799
     }
   ],
   "conditional_calibration": [
@@ -208,31 +223,31 @@
     {
       "tier": "pi",
       "temperature": [
-        1.177096962928772,
-        1.0,
-        2.7583625316619873,
-        1.828574538230896
+        1.1751207113265991,
+        2.1079957485198975,
+        2.7942140102386475,
+        1.8298767805099487
       ],
       "note": [
-        "refit on 87 escalated calib states",
-        "kept marginal: only 0 labelled escalated calib states",
-        "refit on 30 escalated calib states",
-        "refit on 78 escalated calib states"
+        "refit on 87 escalated calib states vs ground truth",
+        "refit on 86 escalated calib states vs final-tier answers",
+        "refit on 30 escalated calib states vs ground truth",
+        "refit on 78 escalated calib states vs ground truth"
       ]
     },
     {
       "tier": "laya(cached)",
       "temperature": [
-        1.1545705795288086,
+        1.1649669408798218,
         1.0,
         1.0,
         3.353081226348877
       ],
       "note": [
-        "refit on 81 escalated calib states",
-        "kept marginal: only 0 labelled escalated calib states",
-        "kept marginal: only 28 labelled escalated calib states",
-        "refit on 72 escalated calib states"
+        "refit on 79 escalated calib states vs ground truth",
+        "kept marginal: only 0 escalated calib states with a target",
+        "kept marginal: only 28 escalated calib states with a target",
+        "refit on 72 escalated calib states vs ground truth"
       ]
     }
   ],
@@ -246,22 +261,25 @@
           "answered": 1457,
           "share": 0.90272614622057,
           "labelled": 1457,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9759780370624571,
           "accuracy_on_kept_hi": 0.9817470609026224
         },
         {
           "id": "urgency",
-          "answered": 1049,
-          "share": 0.6499380421313506,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 1436,
+          "share": 0.8897149938042132,
+          "labelled": 1436,
+          "target": "final tier",
+          "accuracy_on_kept": 0.8628133704735376,
+          "accuracy_on_kept_hi": 0.8770674327061967
         },
         {
           "id": "refund_requested",
           "answered": 1564,
           "share": 0.9690210656753407,
           "labelled": 1564,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9865728900255755,
           "accuracy_on_kept_hi": 0.9905890501437515
         },
@@ -270,6 +288,7 @@
           "answered": 1464,
           "share": 0.9070631970260223,
           "labelled": 1464,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9760928961748634,
           "accuracy_on_kept_hi": 0.9818345568105484
         }
@@ -277,29 +296,32 @@
     },
     {
       "tier": "pi",
-      "requests_reaching_tier": 793,
+      "requests_reaching_tier": 482,
       "questions": [
         {
           "id": "department",
           "answered": 34,
           "share": 0.021065675340768277,
           "labelled": 34,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.7941176470588235,
           "accuracy_on_kept_hi": 0.8843420981123216
         },
         {
           "id": "urgency",
-          "answered": 219,
-          "share": 0.13568773234200743,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 123,
+          "share": 0.0762081784386617,
+          "labelled": 123,
+          "target": "final tier",
+          "accuracy_on_kept": 0.7317073170731707,
+          "accuracy_on_kept_hi": 0.7919176438854775
         },
         {
           "id": "refund_requested",
           "answered": 30,
           "share": 0.01858736059479554,
           "labelled": 30,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6666666666666666,
           "accuracy_on_kept_hi": 0.7891720597717535
         },
@@ -308,6 +330,7 @@
           "answered": 64,
           "share": 0.03965303593556382,
           "labelled": 64,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.890625,
           "accuracy_on_kept_hi": 0.9396074762462042
         }
@@ -315,21 +338,23 @@
     },
     {
       "tier": "laya(cached)",
-      "requests_reaching_tier": 523,
+      "requests_reaching_tier": 267,
       "questions": [
         {
           "id": "department",
           "answered": 123,
           "share": 0.0762081784386617,
           "labelled": 123,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.42276422764227645,
           "accuracy_on_kept_hi": 0.4969251527174034
         },
         {
           "id": "urgency",
-          "answered": 346,
-          "share": 0.21437422552664187,
+          "answered": 55,
+          "share": 0.03407682775712516,
           "labelled": 0,
+          "target": "final tier",
           "accuracy_on_kept": null,
           "accuracy_on_kept_hi": 1.0
         },
@@ -338,6 +363,7 @@
           "answered": 20,
           "share": 0.012391573729863693,
           "labelled": 20,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.55,
           "accuracy_on_kept_hi": 0.7158890598605915
         },
@@ -346,6 +372,7 @@
           "answered": 86,
           "share": 0.05328376703841388,
           "labelled": 86,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.5581395348837209,
           "accuracy_on_kept_hi": 0.6431208707659837
         }
@@ -366,22 +393,25 @@
           "answered": 1457,
           "share": 0.90272614622057,
           "labelled": 1457,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9759780370624571,
           "accuracy_on_kept_hi": 0.9817470609026224
         },
         {
           "id": "urgency",
-          "answered": 1049,
-          "share": 0.6499380421313506,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 1436,
+          "share": 0.8897149938042132,
+          "labelled": 1436,
+          "target": "final tier",
+          "accuracy_on_kept": 0.8628133704735376,
+          "accuracy_on_kept_hi": 0.8770674327061967
         },
         {
           "id": "refund_requested",
           "answered": 1564,
           "share": 0.9690210656753407,
           "labelled": 1564,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9865728900255755,
           "accuracy_on_kept_hi": 0.9905890501437515
         },
@@ -390,6 +420,7 @@
           "answered": 1464,
           "share": 0.9070631970260223,
           "labelled": 1464,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9760928961748634,
           "accuracy_on_kept_hi": 0.9818345568105484
         }
@@ -397,29 +428,32 @@
     },
     {
       "tier": "pi",
-      "requests_reaching_tier": 793,
+      "requests_reaching_tier": 482,
       "questions": [
         {
           "id": "department",
-          "answered": 24,
-          "share": 0.01486988847583643,
-          "labelled": 24,
-          "accuracy_on_kept": 0.8333333333333334,
-          "accuracy_on_kept_hi": 0.9229024739994866
+          "answered": 25,
+          "share": 0.015489467162329617,
+          "labelled": 25,
+          "target": "ground-truth",
+          "accuracy_on_kept": 0.84,
+          "accuracy_on_kept_hi": 0.9260798543285838
         },
         {
           "id": "urgency",
-          "answered": 219,
-          "share": 0.13568773234200743,
-          "labelled": 0,
-          "accuracy_on_kept": null,
-          "accuracy_on_kept_hi": 1.0
+          "answered": 62,
+          "share": 0.03841387856257745,
+          "labelled": 62,
+          "target": "final tier",
+          "accuracy_on_kept": 0.8225806451612904,
+          "accuracy_on_kept_hi": 0.8883702209621556
         },
         {
           "id": "refund_requested",
           "answered": 2,
           "share": 0.0012391573729863693,
           "labelled": 2,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.5,
           "accuracy_on_kept_hi": 0.8791480193875478
         },
@@ -428,6 +462,7 @@
           "answered": 19,
           "share": 0.011771995043370507,
           "labelled": 19,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.9473684210526315,
           "accuracy_on_kept_hi": 0.9881707066183946
         }
@@ -435,21 +470,23 @@
     },
     {
       "tier": "laya(cached)",
-      "requests_reaching_tier": 588,
+      "requests_reaching_tier": 397,
       "questions": [
         {
           "id": "department",
-          "answered": 133,
-          "share": 0.08240396530359356,
-          "labelled": 133,
-          "accuracy_on_kept": 0.44360902255639095,
-          "accuracy_on_kept_hi": 0.5148971551972761
+          "answered": 132,
+          "share": 0.08178438661710037,
+          "labelled": 132,
+          "target": "ground-truth",
+          "accuracy_on_kept": 0.4393939393939394,
+          "accuracy_on_kept_hi": 0.5109661551362252
         },
         {
           "id": "urgency",
-          "answered": 346,
-          "share": 0.21437422552664187,
+          "answered": 116,
+          "share": 0.07187112763320942,
           "labelled": 0,
+          "target": "final tier",
           "accuracy_on_kept": null,
           "accuracy_on_kept_hi": 1.0
         },
@@ -458,6 +495,7 @@
           "answered": 48,
           "share": 0.02973977695167286,
           "labelled": 48,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.5416666666666666,
           "accuracy_on_kept_hi": 0.6545691780565361
         },
@@ -466,6 +504,7 @@
           "answered": 131,
           "share": 0.0811648079306072,
           "labelled": 131,
+          "target": "ground-truth",
           "accuracy_on_kept": 0.6412213740458015,
           "accuracy_on_kept_hi": 0.7066581585076906
         }
@@ -473,7 +512,7 @@
     }
   ],
   "cascade_accuracy": 0.9504337050805453,
-  "expected_latency_ms": 5.485463262701362,
+  "expected_latency_ms": 3.292479097273854,
   "passed": true,
   "failures": []
 }

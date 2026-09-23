@@ -1,6 +1,6 @@
 {
   "schema": "support_triage",
-  "schema_hash": "a37cb530059e62f4",
+  "schema_hash": "a619773e2187e7af",
   "target": "pi",
   "teacher": {
     "name": "laya",
@@ -47,12 +47,15 @@
     }
   },
   "threshold": 0.8,
-  "compile_seconds": 71.249326518,
+  "thresholds": {
+    "urgency": 0.6
+  },
+  "compile_seconds": 85.577165881,
   "encoder": "sentence-transformers/all-MiniLM-L6-v2@1110a243#5990d3e2a5e58e90",
   "size": {
-    "heads_bytes": 3171272,
+    "heads_bytes": 807624,
     "encoder_bytes": 23752896,
-    "total_bytes": 26924168,
+    "total_bytes": 24560520,
     "budget": null
   },
   "questions": [
@@ -63,7 +66,7 @@
       "calibration_target": "ground-truth",
       "teacher_temperature": 0.6539977788925171,
       "teacher_temperature_source": "refit on 798 labelled calib states (shipped 1.760)",
-      "student_temperature": 0.9164462089538574,
+      "student_temperature": 0.9151225686073303,
       "agreement": {
         "value": 0.9714993804213135,
         "lo": 0.9646840148698885,
@@ -71,12 +74,12 @@
         "n": 1614
       },
       "ece": {
-        "value": 0.019584865448938723,
-        "lo": 0.016302986400573524,
-        "hi": 0.029571124833755777,
+        "value": 0.01969044831901087,
+        "lo": 0.016033130655205972,
+        "hi": 0.029714026175614774,
         "n": 1614
       },
-      "ece_uncalibrated": 0.023889175965883476,
+      "ece_uncalibrated": 0.024456412726470825,
       "accuracy_gt": {
         "value": 0.9306071871127634,
         "lo": 0.9213135068153655,
@@ -95,7 +98,7 @@
         "hi": 0.034204019489784666,
         "n": 1614
       },
-      "mean_tv_to_teacher": 0.03594888739898131,
+      "mean_tv_to_teacher": 0.035917858118711975,
       "score_mae_to_teacher": null,
       "selective": {
         "threshold": 0.8,
@@ -111,35 +114,35 @@
       "calibration_target": "teacher",
       "teacher_temperature": 1.2514300346374512,
       "teacher_temperature_source": "laya shipped",
-      "student_temperature": 0.18035303056240082,
+      "student_temperature": 0.18026335537433624,
       "agreement": {
-        "value": 0.8587360594795539,
-        "lo": 0.8438661710037175,
-        "hi": 0.872366790582404,
+        "value": 0.8599752168525403,
+        "lo": 0.8444857496902106,
+        "hi": 0.8736059479553904,
         "n": 1614
       },
       "ece": {
-        "value": 0.031230265673947006,
-        "lo": 0.025704080989074233,
-        "hi": 0.04577764078439242,
+        "value": 0.03224427023120086,
+        "lo": 0.02565473630156511,
+        "hi": 0.046375540423275075,
         "n": 1614
       },
-      "ece_uncalibrated": 0.3737123501492846,
+      "ece_uncalibrated": 0.3749077409468914,
       "accuracy_gt": null,
       "teacher_accuracy_gt": null,
       "teacher_ece_gt": null,
-      "mean_tv_to_teacher": 0.35864023775233894,
+      "mean_tv_to_teacher": 0.3588545046270106,
       "score_mae_to_teacher": {
-        "value": 0.18911050892936845,
-        "lo": 0.18141416026599894,
-        "hi": 0.19699907280618342,
+        "value": 0.1889638644746852,
+        "lo": 0.18126580849403878,
+        "hi": 0.1968793902644794,
         "n": 1614
       },
       "selective": {
-        "threshold": 0.8,
-        "coverage": 0.6499380421313506,
-        "accuracy": 0.9494756911344138,
-        "n": 1049
+        "threshold": 0.6,
+        "coverage": 0.8903345724907064,
+        "accuracy": 0.8970076548364648,
+        "n": 1437
       }
     },
     {
@@ -149,7 +152,7 @@
       "calibration_target": "ground-truth",
       "teacher_temperature": 0.8054840564727783,
       "teacher_temperature_source": "refit on 798 labelled calib states (shipped 1.983)",
-      "student_temperature": 0.8351189494132996,
+      "student_temperature": 0.8370524048805237,
       "agreement": {
         "value": 0.9795539033457249,
         "lo": 0.9733581164807931,
@@ -157,12 +160,12 @@
         "n": 1614
       },
       "ece": {
-        "value": 0.009830398076528954,
-        "lo": 0.007147080466945227,
-        "hi": 0.01714078784727548,
+        "value": 0.008989156104965871,
+        "lo": 0.006977097621785368,
+        "hi": 0.01680353959696887,
         "n": 1614
       },
-      "ece_uncalibrated": 0.005235245347466167,
+      "ece_uncalibrated": 0.006351459868335368,
       "accuracy_gt": {
         "value": 0.9714993804213135,
         "lo": 0.9646840148698885,
@@ -181,7 +184,7 @@
         "hi": 0.019473791307085365,
         "n": 1614
       },
-      "mean_tv_to_teacher": 0.02614531538207337,
+      "mean_tv_to_teacher": 0.026156691797279,
       "score_mae_to_teacher": null,
       "selective": {
         "threshold": 0.8,
@@ -197,24 +200,24 @@
       "calibration_target": "ground-truth",
       "teacher_temperature": 0.8851046562194824,
       "teacher_temperature_source": "refit on 798 labelled calib states (shipped 1.983)",
-      "student_temperature": 0.8507320880889893,
+      "student_temperature": 0.8501425385475159,
       "agreement": {
-        "value": 0.9708798017348204,
+        "value": 0.9702602230483272,
         "lo": 0.9634448574969021,
         "hi": 0.9770755885997522,
         "n": 1614
       },
       "ece": {
-        "value": 0.01048258046678451,
-        "lo": 0.010191390616299936,
-        "hi": 0.02156999463485519,
+        "value": 0.010630353712828777,
+        "lo": 0.01043553641146739,
+        "hi": 0.021932845295878887,
         "n": 1614
       },
-      "ece_uncalibrated": 0.02114105368635468,
+      "ece_uncalibrated": 0.01978446064976216,
       "accuracy_gt": {
-        "value": 0.9504337050805453,
-        "lo": 0.9411400247831475,
-        "hi": 0.9591078066914498,
+        "value": 0.949814126394052,
+        "lo": 0.9405204460966543,
+        "hi": 0.9578686493184635,
         "n": 1614
       },
       "teacher_accuracy_gt": {
@@ -229,7 +232,7 @@
         "hi": 0.02227676424395196,
         "n": 1614
       },
-      "mean_tv_to_teacher": 0.047574236219580894,
+      "mean_tv_to_teacher": 0.04760160172410687,
       "score_mae_to_teacher": null,
       "selective": {
         "threshold": 0.8,
