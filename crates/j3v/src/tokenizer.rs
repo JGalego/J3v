@@ -20,7 +20,10 @@ fn is_cjk(c: char) -> bool {
 
 fn is_punct(c: char) -> bool {
     let u = c as u32;
-    (33..=47).contains(&u) || (58..=64).contains(&u) || (91..=96).contains(&u) || (123..=126).contains(&u)
+    (33..=47).contains(&u)
+        || (58..=64).contains(&u)
+        || (91..=96).contains(&u)
+        || (123..=126).contains(&u)
         || matches!(u, 0xA1 | 0xA7 | 0xAB | 0xB6 | 0xB7 | 0xBB | 0xBF | 0x2010..=0x2027 | 0x2030..=0x205E
             | 0x3001..=0x3003 | 0x3008..=0x3011 | 0x3014..=0x301F | 0xFF01..=0xFF0F | 0xFF1A..=0xFF20
             | 0xFF3B..=0xFF3D | 0xFF5B..=0xFF65 | 0x055A..=0x055F | 0x0589 | 0x05BE | 0x060C | 0x061B | 0x061F
@@ -59,11 +62,8 @@ impl WordPiece {
         }
         let mut out = Vec::new();
         for w in clean.split_whitespace() {
-            let w: String = if self.lowercase {
-                w.to_lowercase().nfd().filter(|&c| !is_combining_mark(c)).collect()
-            } else {
-                w.to_string()
-            };
+            let w: String =
+                if self.lowercase { w.to_lowercase().nfd().filter(|&c| !is_combining_mark(c)).collect() } else { w.to_string() };
             let mut cur = String::new();
             for c in w.chars() {
                 if is_punct(c) {

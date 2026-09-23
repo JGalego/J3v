@@ -25,6 +25,7 @@ USAGE:
   j3v predict --encoder <enc.j3a> <artifact.j3a> '<request json>'
   j3v serve   --encoder <enc.j3a> <artifact.j3a> [--addr 0.0.0.0:8000] [--threads 1]
   j3v bench   --encoder <enc.j3a> <artifact.j3a> <states.jsonl> [--n 500]
+  j3v mcu-codegen <mcu.j3a> -o <model.rs>            firmware source for an mcu artifact
   j3v mcu-predict <mcu.j3a> <inputs.txt>            host run of the mcu model (same output as the firmware)
   j3v cascade --mcu <m.j3a> --pi <p.j3a> --encoder <enc.j3a> --states <s.jsonl> [--upstream http://host:8000 | --teacher <teacher.json>]
               [--split test|all] [--n 400]           run + certify the mcu -> pi -> laya cascade
@@ -97,7 +98,9 @@ fn main() {
             if !out.failures.is_empty() {
                 let mut m = format!(
                     "\nerror[E0301]: `{}` cannot meet its conformance bounds on target `{}`\n --> {}\n",
-                    out.report["schema"].as_str().unwrap_or(""), o.target, o.schema
+                    out.report["schema"].as_str().unwrap_or(""),
+                    o.target,
+                    o.schema
                 );
                 for f in &out.failures {
                     m += &format!("  | {}\n", f);
@@ -155,6 +158,13 @@ fn main() {
             );
         }
         Some("cascade") => cascade_cmd(&fl),
+        Some("mcu-codegen") => {
+            let a = Artifact::load(pos.get(1).unwrap_or_else(|| die(USAGE))).unwrap_or_else(|e| die(e));
+            let om = mcu::Owned::load(&a).unwrap_or_else(|e| die(e));
+            let schema: j3v_core::schema::Schema = serde_json::from_value(a.header.meta["schema"].clone()).unwrap_or_else(|e| die(e));
+            let out = fl.get("out").unwrap_or_else(|| die("error: -o <model.rs> is required"));
+            std::fs::write(out, om.to_rust(&schema)).unwrap_or_else(|e| die(e));
+        }
         Some("mcu-predict") => {
             // same computation and output format as firmware/cortex-m7, for bit-exact comparison
             let a = Artifact::load(pos.get(1).unwrap_or_else(|| die(USAGE))).unwrap_or_else(|e| die(e));
@@ -189,10 +199,24 @@ fn main() {
 }
 
 fn print_report(r: &Value) {
-    eprintln!("\nconformance: {} -> {} (test n={})", r["schema"].as_str().unwrap_or(""), r["target"].as_str().unwrap_or(""), r["states"]["test"]);
-    eprintln!("{:<18} {:>6} {:>17} {:>17} {:>17} {:>9} {:>14}", "question", "target", "agreement [lo]", "ECE [hi]", "acc(gt) [lo]", "teach.acc", "kept@thr acc");
+    eprintln!(
+        "\nconformance: {} -> {} (test n={})",
+        r["schema"].as_str().unwrap_or(""),
+        r["target"].as_str().unwrap_or(""),
+        r["states"]["test"]
+    );
+    eprintln!(
+        "{:<18} {:>6} {:>17} {:>17} {:>17} {:>9} {:>14}",
+        "question", "target", "agreement [lo]", "ECE [hi]", "acc(gt) [lo]", "teach.acc", "kept@thr acc"
+    );
     for q in r["questions"].as_array().unwrap() {
-        let est = |v: &Value, lo: &str| if v.is_null() { "-".to_string() } else { format!("{:.3} [{:.3}]", v["value"].as_f64().unwrap(), v[lo].as_f64().unwrap()) };
+        let est = |v: &Value, lo: &str| {
+            if v.is_null() {
+                "-".to_string()
+            } else {
+                format!("{:.3} [{:.3}]", v["value"].as_f64().unwrap(), v[lo].as_f64().unwrap())
+            }
+        };
         let s = &q["selective"];
         eprintln!(
             "{:<18} {:>6} {:>17} {:>17} {:>17} {:>9} {:>14}",
@@ -282,18 +306,31 @@ fn cascade_cmd(fl: &HashMap<String, String>) {
     for t in rep["tiers"].as_array().unwrap() {
         eprintln!("  {} (threshold {}, p50 {:.2} ms)", t["tier"].as_str().unwrap(), t["threshold"], t["latency_ms_p50"].as_f64().unwrap());
         for q in t["questions"].as_array().unwrap() {
-            eprintln!("    {:<18} acc {:<24} ece {}", q["id"].as_str().unwrap(), cascade::est_str(&q["accuracy"]), cascade::est_str(&q["ece"]));
+            eprintln!(
+                "    {:<18} acc {:<24} ece {}",
+                q["id"].as_str().unwrap(),
+                cascade::est_str(&q["accuracy"]),
+                cascade::est_str(&q["ece"])
+            );
         }
     }
     eprintln!("\nrouting (per question):");
     for t in rep["routing"].as_array().unwrap() {
         eprintln!("  {} (reached by {} requests)", t["tier"].as_str().unwrap(), t["requests_reaching_tier"]);
         for q in t["questions"].as_array().unwrap() {
-            eprintln!("    {:<18} kept {:>5.1}%  accuracy on kept {}", q["id"].as_str().unwrap(), q["share"].as_f64().unwrap() * 100.0,
-                q["accuracy_on_kept"].as_f64().map_or("-".into(), |v| format!("{:.3}", v)));
+            eprintln!(
+                "    {:<18} kept {:>5.1}%  accuracy on kept {}",
+                q["id"].as_str().unwrap(),
+                q["share"].as_f64().unwrap() * 100.0,
+                q["accuracy_on_kept"].as_f64().map_or("-".into(), |v| format!("{:.3}", v))
+            );
         }
     }
-    eprintln!("\ncascade accuracy {:.3}, expected latency {:.2} ms/request", rep["cascade_accuracy"].as_f64().unwrap_or(f64::NAN), rep["expected_latency_ms"].as_f64().unwrap());
+    eprintln!(
+        "\ncascade accuracy {:.3}, expected latency {:.2} ms/request",
+        rep["cascade_accuracy"].as_f64().unwrap_or(f64::NAN),
+        rep["expected_latency_ms"].as_f64().unwrap()
+    );
     if !rep["failures"].as_array().unwrap().is_empty() {
         let f: Vec<String> = rep["failures"].as_array().unwrap().iter().map(|v| format!("  | {}", v.as_str().unwrap())).collect();
         die(format!("error[E0401]: cascade contract violated\n{}", f.join("\n")));

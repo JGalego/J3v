@@ -96,11 +96,20 @@ impl Engine {
                     let q = question_from_laya(id, qd).map_err(|e| (422, e))?;
                     let j = self.schema.questions.iter().position(|c| c.id == *id).ok_or((
                         422,
-                        format!("question {:?} is not compiled into this artifact (schema `{}`); route it to the next tier", id, self.schema.name),
+                        format!(
+                            "question {:?} is not compiled into this artifact (schema `{}`); route it to the next tier",
+                            id, self.schema.name
+                        ),
                     ))?;
                     let c = &self.schema.questions[j];
-                    if c.qtype != q.qtype || c.instructions != q.instructions || c.options.iter().map(|o| &o.key).ne(q.options.iter().map(|o| &o.key)) {
-                        return Err((422, format!("question {:?} differs from the compiled definition; recompile or route it to the next tier", id)));
+                    if c.qtype != q.qtype
+                        || c.instructions != q.instructions
+                        || c.options.iter().map(|o| &o.key).ne(q.options.iter().map(|o| &o.key))
+                    {
+                        return Err((
+                            422,
+                            format!("question {:?} differs from the compiled definition; recompile or route it to the next tier", id),
+                        ));
                     }
                     v.push(j);
                 }

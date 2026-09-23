@@ -77,18 +77,16 @@ impl Owned {
             s1: a.f32("w1.s")?,
             b1: a.f32("w1.b")?,
             heads,
-            temps: mt["calibration"]["temperature"].as_array().map_or(vec![1.0; nq], |t| t.iter().map(|v| v.as_f64().unwrap() as f32).collect()),
+            temps: mt["calibration"]["temperature"]
+                .as_array()
+                .map_or(vec![1.0; nq], |t| t.iter().map(|v| v.as_f64().unwrap() as f32).collect()),
             threshold: mt["threshold"].as_f64().unwrap_or(0.8) as f32,
         })
     }
 
     pub fn with<R>(&self, f: impl FnOnce(&m::Model) -> R) -> R {
-        let heads: Vec<m::Head> = self
-            .heads
-            .iter()
-            .zip(&self.temps)
-            .map(|((w, s, b, k), &t)| m::Head { w, s, b, k: *k, temperature: t })
-            .collect();
+        let heads: Vec<m::Head> =
+            self.heads.iter().zip(&self.temps).map(|((w, s, b, k), &t)| m::Head { w, s, b, k: *k, temperature: t }).collect();
         let model = m::Model {
             buckets: self.c.buckets as u32,
             dim: self.c.dim,
@@ -238,9 +236,11 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
         })
         .collect();
     eprintln!("[j3v] mcu: {} of {} model sizes fit {}; training {}", fits.len(), all.len(), kb(budget.flash), pick.len());
-    run_python(o, "j3vc.distill_mcu", &[
-        "--feats", &abs_path(&fpath), "--targets", &abs_path(&p.targets), "--candidates", &Value::Array(cands.clone()).to_string(),
-    ])?;
+    run_python(
+        o,
+        "j3vc.distill_mcu",
+        &["--feats", &abs_path(&fpath), "--targets", &abs_path(&p.targets), "--candidates", &Value::Array(cands.clone()).to_string()],
+    )?;
     let texts: Vec<String> = p.rows.iter().map(|r| state_text(&r.state)).collect();
     let nq = schema.questions.len();
     let mut tried = Vec::new();
@@ -267,7 +267,10 @@ pub fn compile(o: &Opts, schema: Schema) -> Result<Outcome, String> {
                              "ece": reports.iter().map(|r| (r.id.clone(), r.ece.value)).collect::<Vec<_>>()});
         eprintln!(
             "  mcu {:>5}x{:<2} h{:<2} {:>9} flash: {}",
-            c.buckets, c.dim, c.hidden, kb(*flash),
+            c.buckets,
+            c.dim,
+            c.hidden,
+            kb(*flash),
             if failures.is_empty() { "PASS".to_string() } else { format!("fail ({} bound(s))", failures.len()) }
         );
         tried.push(summary);

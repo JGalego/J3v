@@ -120,11 +120,7 @@ pub fn set_threads(n: usize) {
 }
 
 fn threads() -> usize {
-    *THREADS.get_or_init(|| {
-        std::env::var("J3V_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or_else(|| {
-            1
-        })
-    })
+    *THREADS.get_or_init(|| std::env::var("J3V_THREADS").ok().and_then(|v| v.parse().ok()).unwrap_or_else(|| 1))
 }
 
 impl QLinear {
@@ -404,11 +400,11 @@ pub fn import_hf(dir: &str, source: &str) -> Result<Artifact, String> {
     };
     for i in 0..n {
         let p = format!("encoder.layer.{}", i);
-        lin(&mut a, &format!("l{}.qkv", i), &[
-            &format!("{}.attention.self.query", p),
-            &format!("{}.attention.self.key", p),
-            &format!("{}.attention.self.value", p),
-        ])?;
+        lin(
+            &mut a,
+            &format!("l{}.qkv", i),
+            &[&format!("{}.attention.self.query", p), &format!("{}.attention.self.key", p), &format!("{}.attention.self.value", p)],
+        )?;
         lin(&mut a, &format!("l{}.o", i), &[&format!("{}.attention.output.dense", p)])?;
         a.add_f32(&format!("l{}.ln1.g", i), &[d], &get(&format!("{}.attention.output.LayerNorm.weight", p))?.1);
         a.add_f32(&format!("l{}.ln1.b", i), &[d], &get(&format!("{}.attention.output.LayerNorm.bias", p))?.1);

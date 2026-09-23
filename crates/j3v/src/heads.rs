@@ -56,6 +56,8 @@ impl Head {
             let w = &self.w1[o * 2 * d..(o + 1) * 2 * d];
             x[o] = gelu_tanh(w.iter().zip(&f).map(|(a, b)| a * b).sum::<f32>() + self.b1[o]);
         }
-        (0..self.k).map(|o| self.w2[o * self.hid..(o + 1) * self.hid].iter().zip(&x).map(|(a, b)| a * b).sum::<f32>() + self.b2[o]).collect()
+        (0..self.k)
+            .map(|o| self.w2[o * self.hid..(o + 1) * self.hid].iter().zip(&x).map(|(a, b)| a * b).sum::<f32>() + self.b2[o])
+            .collect()
     }
 }

@@ -143,7 +143,13 @@ mod tests {
             let mut p = [0f32; 3];
             softmax_t(&z, 2.0, &mut p);
             let u = rng.below(1_000_000) as f32 / 1e6;
-            let y = if u < p[0] { 0 } else if u < p[0] + p[1] { 1 } else { 2 };
+            let y = if u < p[0] {
+                0
+            } else if u < p[0] + p[1] {
+                1
+            } else {
+                2
+            };
             zs.push(z);
             ys.push(y);
         }

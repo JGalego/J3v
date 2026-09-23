@@ -356,8 +356,9 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
                 match &t.tok {
                     Tok::Word(w) if TEACHERS.contains(&w.as_str()) => teacher = w.clone(),
                     _ => {
-                        return Err(SchemaError::new(ln, t.col, "unknown teacher")
-                            .help(format!("supported teachers: {}", TEACHERS.join(", "))))
+                        return Err(
+                            SchemaError::new(ln, t.col, "unknown teacher").help(format!("supported teachers: {}", TEACHERS.join(", ")))
+                        )
                     }
                 }
                 end(2)?;
@@ -427,9 +428,8 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
                 in_question = true;
             }
             _ => {
-                return Err(SchemaError::new(ln, toks[0].col, format!("unknown keyword `{}`", kw)).help(
-                    "keywords: schema, version, teacher, max_state_tokens, choice, score, noul, threshold, require",
-                ))
+                return Err(SchemaError::new(ln, toks[0].col, format!("unknown keyword `{}`", kw))
+                    .help("keywords: schema, version, teacher, max_state_tokens, choice, score, noul, threshold, require"))
             }
         }
     }
@@ -444,9 +444,7 @@ pub fn parse_dsl(src: &str) -> Result<Schema, SchemaError> {
                 return Err(SchemaError::new(ln, 1, format!("choice `{}` has {} option(s), needs at least 2", q.id, k))
                     .help("list options as indented lines below the question"))
             }
-            QType::Score if k < 2 => {
-                return Err(SchemaError::new(ln, 1, format!("score `{}` has {} level(s), needs at least 2", q.id, k)))
-            }
+            QType::Score if k < 2 => return Err(SchemaError::new(ln, 1, format!("score `{}` has {} level(s), needs at least 2", q.id, k))),
             _ if k > MAX_OPTIONS => {
                 return Err(SchemaError::new(ln, 1, format!("`{}` has {} options; J3v supports at most {}", q.id, k, MAX_OPTIONS))
                     .help("the Laya teacher degrades past ~20 options (Banking77: 0.425); split into a coarse-to-fine pair of questions"))

@@ -212,10 +212,22 @@ pub fn prepare(o: &Opts, schema: Schema) -> Result<Prepared, String> {
         let cache = abs(&PathBuf::from(&o.build).join("teacher-cache"));
         std::fs::create_dir_all(&cache).ok();
         let tout = format!("{}/{}", abs(&bdir), tpath.file_name().unwrap().to_string_lossy());
-        run_py(o, "j3vc.teacher", &[
-            "--schema", &abs(&schema_json), "--states", &abs(Path::new(&o.states)), "--cache", &cache, "--out", &tout,
-            "--noul-mode", &o.noul_mode,
-        ])?;
+        run_py(
+            o,
+            "j3vc.teacher",
+            &[
+                "--schema",
+                &abs(&schema_json),
+                "--states",
+                &abs(Path::new(&o.states)),
+                "--cache",
+                &cache,
+                "--out",
+                &tout,
+                "--noul-mode",
+                &o.noul_mode,
+            ],
+        )?;
     }
     let teacher: Value = serde_json::from_str(&std::fs::read_to_string(&tpath).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let tids: Vec<&str> = teacher["ids"].as_array().ok_or("teacher file lacks ids")?.iter().map(|v| v.as_str().unwrap_or("")).collect();
@@ -257,8 +269,7 @@ pub fn prepare(o: &Opts, schema: Schema) -> Result<Prepared, String> {
     }
     let targets = bdir.join("targets.json");
     let tq: Vec<Value> = schema.questions.iter().map(|q| json!({"id": q.id, "k": q.options.len()})).collect();
-    let probs: serde_json::Map<String, Value> =
-        schema.questions.iter().zip(&t_probs).map(|(q, p)| (q.id.clone(), json!(p))).collect();
+    let probs: serde_json::Map<String, Value> = schema.questions.iter().zip(&t_probs).map(|(q, p)| (q.id.clone(), json!(p))).collect();
     std::fs::write(&targets, json!({"questions": tq, "train": train, "calib": calib, "probs": probs}).to_string())
         .map_err(|e| e.to_string())?;
     let teacher_meta = json!({"name": schema.teacher, "revision": teacher["revision"], "noul_mode": teacher["noul_mode"],
@@ -302,12 +313,9 @@ pub fn certify(p: &Prepared, zc: &[Vec<Vec<f32>>], zt: &[Vec<Vec<f32>>]) -> (Vec
         } else {
             (None, None, None)
         };
-        let tv: f64 = test
-            .iter()
-            .zip(&ps)
-            .map(|(&i, p)| 0.5 * p.iter().zip(&tp[i]).map(|(a, b)| (a - b).abs() as f64).sum::<f64>())
-            .sum::<f64>()
-            / test.len() as f64;
+        let tv: f64 =
+            test.iter().zip(&ps).map(|(&i, p)| 0.5 * p.iter().zip(&tp[i]).map(|(a, b)| (a - b).abs() as f64).sum::<f64>()).sum::<f64>()
+                / test.len() as f64;
         let score_mae = (q.qtype == QType::Score).then(|| {
             let ev = |p: &[f32]| p.iter().enumerate().map(|(i, &v)| i as f64 * v as f64).sum::<f64>();
             test.iter().zip(&ps).map(|(&i, p)| (ev(p) - ev(&tp[i])).abs()).sum::<f64>() / test.len() as f64
@@ -401,8 +409,7 @@ fn compile_pi(o: &Opts, schema: Schema) -> Result<Outcome, String> {
     }
     let p = prepare(o, schema)?;
     let schema = &p.schema;
-    let fprefix =
-        p.bdir.join(format!("feats-{:016x}-{}-{}", fnv1a64(enc.id.as_bytes()), &p.states_hash[..8], schema.max_state_tokens));
+    let fprefix = p.bdir.join(format!("feats-{:016x}-{}-{}", fnv1a64(enc.id.as_bytes()), &p.states_hash[..8], schema.max_state_tokens));
     if !PathBuf::from(format!("{}.json", fprefix.display())).exists() {
         eprintln!("[j3v] encoding {} states with `{}`...", p.rows.len(), enc.id);
         let mut f = std::io::BufWriter::new(std::fs::File::create(format!("{}.f32", fprefix.display())).map_err(|e| e.to_string())?);
@@ -419,9 +426,11 @@ fn compile_pi(o: &Opts, schema: Schema) -> Result<Outcome, String> {
     }
     let draft = p.bdir.join("heads.draft.j3a");
     eprintln!("[j3v] distilling heads ({} train / {} calib / {} test)...", p.train.len(), p.calib.len(), p.test.len());
-    run_py(o, "j3vc.distill", &[
-        "--feats", &abs(&fprefix), "--targets", &abs(&p.targets), "--out", &abs(&draft), "--hidden", &o.hidden.to_string(),
-    ])?;
+    run_py(
+        o,
+        "j3vc.distill",
+        &["--feats", &abs(&fprefix), "--targets", &abs(&p.targets), "--out", &abs(&draft), "--hidden", &o.hidden.to_string()],
+    )?;
 
     // run the draft artifact end-to-end (text -> tokenizer -> int8 encoder -> heads) on calib + test
     let mut art = Artifact::load(&draft.to_string_lossy())?;

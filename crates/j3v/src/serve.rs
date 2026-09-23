@@ -17,7 +17,14 @@ fn respond(s: &mut TcpStream, code: u16, body: &Value) {
         _ => "Unprocessable Entity",
     };
     let b = body.to_string();
-    let _ = write!(s, "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", code, reason, b.len(), b);
+    let _ = write!(
+        s,
+        "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+        code,
+        reason,
+        b.len(),
+        b
+    );
 }
 
 fn handle(eng: &Engine, key: &Option<String>, mut s: TcpStream) {
@@ -55,8 +62,12 @@ fn handle(eng: &Engine, key: &Option<String>, mut s: TcpStream) {
     }
     match (method.as_str(), path.as_str()) {
         ("GET", "/healthz") => respond(&mut s, 200, &json!({"ok": true, "model": eng.model})),
-        ("GET", "/v1/schema") => respond(&mut s, 200, &json!({"model": eng.model, "threshold": eng.threshold,
-            "questions": eng.schema.to_laya_questions()})),
+        ("GET", "/v1/schema") => respond(
+            &mut s,
+            200,
+            &json!({"model": eng.model, "threshold": eng.threshold,
+            "questions": eng.schema.to_laya_questions()}),
+        ),
         ("POST", "/v1/systemone") => {
             let t = Instant::now();
             let req: Value = match serde_json::from_slice(&body) {
