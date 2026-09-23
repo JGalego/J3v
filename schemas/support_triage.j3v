@@ -1,0 +1,26 @@
+# Customer-support triage. Ground truth for department / refund_requested / wants_human
+# comes from the Bitext intents (see examples/support_triage/prepare.py); urgency has none.
+schema support_triage
+version 1
+teacher laya
+max_state_tokens 64
+
+choice department "Which department should handle this request?"
+  billing       "invoices, payments, refunds, cancellation fees"
+  orders        "placing, changing or cancelling an order"
+  shipping      "delivery times, delivery options, shipping addresses"
+  account       "creating, editing, deleting or switching accounts, passwords, newsletter"
+  customer_care "complaints, reviews, contacting customer service or a human"
+
+score urgency "How urgent is this request?"
+  "not urgent"
+  "soon"
+  "critical deadline or blocking issue"
+
+noul refund_requested "Does the user ask to get their money back?"
+noul wants_human "Does the user ask to talk to a human agent?"
+
+threshold 0.80
+
+require agreement >= 0.85
+require ece <= 0.05

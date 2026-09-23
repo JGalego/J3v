@@ -1,0 +1,13 @@
+[package]
+name = "j3v"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "J3v compiler driver and pi runtime"
+
+[dependencies]
+j3v-core = { path = "../j3v-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+unicode-normalization = "0.1"
+j3v-mcu = { path = "../j3v-mcu" }
