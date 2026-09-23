@@ -12,6 +12,23 @@ answers. It distills [Laya](https://huggingface.co/convaiinnovations/laya) into 
 fits temperature scaling, and **refuses to emit** an artifact that misses its accuracy/ECE bounds or its
 flash/RAM budget. It returns calibrated probabilities, never text, and speaks Laya's `POST /v1/systemone` shape.
 
+## Install
+
+On Linux (x86_64, 64-bit ARM, or 32-bit ARM such as a Raspberry Pi):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JGalego/J3v/main/install.sh | sh
+```
+
+To also download the shared encoder and the example models into `./j3v-models`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/JGalego/J3v/main/install.sh | J3V_MODELS=j3v-models sh
+j3v predict --encoder j3v-models/minilm.j3a j3v-models/support_triage.pi.j3a '{"state": {"message": "refund me"}}'
+```
+
+The script verifies checksums. `J3V_VERSION` pins a release, and `J3V_INSTALL_DIR` changes the install location.
+
 ## Getting Started
 
 ```bash

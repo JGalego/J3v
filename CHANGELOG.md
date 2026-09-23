@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- `install.sh`: one-line installer (`curl … | sh`) that picks the right static binary, verifies checksums, and
+  can fetch the encoder and example models.
+- `j3v --version`.
+
 ## [0.1.1] - 2026-09-23
 
 ### Added

@@ -167,3 +167,18 @@ jobs:
             --states $D/data/heldout.jsonl --teacher $D/data/laya.heldout.json -o cascade.json 2> cascade.txt || { cat cascade.txt; exit 1; }
           cat cascade.txt
           { echo '### cascade (offline, cached Laya answers)'; echo '```'; sed -n '/routing with conditional/,$p' cascade.txt | grep -v 'conditional temperatures'; echo '```'; } >> $GITHUB_STEP_SUMMARY
+
+  install:
+    name: install.sh (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm]
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck install.sh
+      - name: install the latest release with models, then predict
+        run: |
+          J3V_INSTALL_DIR="$RUNNER_TEMP/bin" J3V_MODELS="$RUNNER_TEMP/models" sh install.sh
+          "$RUNNER_TEMP/bin/j3v" predict --encoder "$RUNNER_TEMP/models/minilm.j3a" "$RUNNER_TEMP/models/support_triage.pi.j3a" \
+            '{"state": {"message": "I was charged twice, refund me"}}' | grep -q '"choice": "billing"'

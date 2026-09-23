@@ -17,6 +17,7 @@ use std::time::Instant;
 const USAGE: &str = "j3v - compile typed decision schemas into calibrated edge artifacts
 
 USAGE:
+  j3v --version
   j3v check <schema.j3v|.json>                       parse + validate a schema, print canonical JSON
   j3v compile <schema> --target pi --encoder <enc.j3a> --states <states.jsonl> -o <out.j3a> [--budget 64MB]
   j3v compile <schema> --target mcu --budget 512KB --states <states.jsonl> -o <out.j3a>   (also writes <out>.rs)
@@ -66,6 +67,10 @@ fn pct(v: &mut [f64], p: f64) -> f64 {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if matches!(args.first().map(String::as_str), Some("--version" | "-V" | "version")) {
+        println!("j3v {}", env!("CARGO_PKG_VERSION"));
+        return;
+    }
     let (pos, fl) = parse(&args);
     let get = |k: &str, d: &str| fl.get(k).cloned().unwrap_or_else(|| d.to_string());
     if let Some(t) = fl.get("threads") {
