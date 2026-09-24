@@ -28,10 +28,17 @@ services:
     entrypoint: ["/j3v", "serve", "/models/model.j3a", "--encoder", "/models/minilm.j3a",
                  "--addr", "0.0.0.0:8000", "--threads", "1", "--upstream", "http://laya:8000"]
 
-  # Stand-in for your Laya / Jev deployment. Replace `image:` with whatever serves the teacher you
-  # compiled against -- the artifact was calibrated to *that* teacher, so pointing it at a different one
-  # invalidates the cascade's conformance report.
+  # Your Laya / Jev deployment. There is no public image to point at, so set LAYA_IMAGE:
+  #
+  #   LAYA_IMAGE=your-registry/laya-serve:tag docker compose --profile cascade up
+  #
+  # (The placeholder default is not a real image: leaving it unset fails the pull by name rather than
+  # silently starting something wrong. A `${LAYA_IMAGE:?...}` default would break the non-cascade profile
+  # too, since compose interpolates every service regardless of which profile is active.)
+  #
+  # It must serve the teacher the artifact was *compiled against* -- the artifact is calibrated to that
+  # teacher, so a different one invalidates the cascade's conformance report.
   laya:
     profiles: ["cascade"]
-    image: ghcr.io/example/laya-serve:latest
+    image: ${LAYA_IMAGE:-set-LAYA_IMAGE-to-your-laya-serve-image}
     ports: ["8100:8000"]
