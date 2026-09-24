@@ -1,3 +1,4 @@
 firmware/cortex-m7/src/model.rs
 target/
 build/
+__pycache__/

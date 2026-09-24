@@ -446,12 +446,16 @@ fn compile_pi(o: &Opts, schema: Schema) -> Result<Outcome, String> {
         &["--feats", &abs(&fprefix), "--targets", &abs(&p.targets), "--out", &abs(&draft), "--hidden", &o.hidden.to_string()],
     )?;
 
-    // run the draft artifact end-to-end (text -> tokenizer -> int8 encoder -> heads) on calib + test
-    let mut art = crate::heads::quantize(&Artifact::load(&draft.to_string_lossy())?, schema.questions.len())?;
-    art.header.meta = json!({"schema": schema.to_canonical_json(), "encoder": enc.id});
-    let eng = Engine::new(enc, &art)?;
+    // run the draft (fp32) and quantized (int8) heads end-to-end (text -> tokenizer -> int8 encoder -> heads)
+    // on calib + test, through the identical kernels. The encoder features are the same in both runs (it's
+    // always int8 -- see encoder_quant_effect.py for that comparison), so the delta between them isolates
+    // exactly what quantizing the heads themselves costs.
+    let mut art_fp32 = Artifact::load(&draft.to_string_lossy())?;
+    art_fp32.header.meta = json!({"schema": schema.to_canonical_json(), "encoder": &enc.id});
+    // `quantize` copies `art_fp32.header.meta` as-is, so `art` inherits the same schema/encoder meta.
+    let mut art = crate::heads::quantize(&art_fp32, schema.questions.len())?;
     let nq = schema.questions.len();
-    let run = |ix: &[usize]| -> Vec<Vec<Vec<f32>>> {
+    let logits_for = |eng: &Engine, ix: &[usize]| -> Vec<Vec<Vec<f32>>> {
         let mut out = vec![Vec::with_capacity(ix.len()); nq];
         for &i in ix {
             for (j, zz) in eng.logits(&p.rows[i].state).0.into_iter().enumerate() {
@@ -460,19 +464,51 @@ fn compile_pi(o: &Opts, schema: Schema) -> Result<Outcome, String> {
         }
         out
     };
-    let (zc, zt) = (run(&p.calib), run(&p.test));
+    let eng_fp32 = Engine::new(Encoder::load(&enc_art)?, &art_fp32)?;
+    let (zc32, zt32) = (logits_for(&eng_fp32, &p.calib), logits_for(&eng_fp32, &p.test));
+    let (reports_fp32, _, _) = certify(&p, &zc32, &zt32);
+
+    let eng = Engine::new(enc, &art)?;
+    let (zc, zt) = (logits_for(&eng, &p.calib), logits_for(&eng, &p.test));
     let (reports, mut failures, temps) = certify(&p, &zc, &zt);
     let heads_bytes = art.to_bytes().len();
+    let heads_bytes_fp32 = art_fp32.to_bytes().len();
     let total = heads_bytes + enc_bytes;
     if let Some(b) = o.budget {
         if total > b.flash {
             failures.push(format!("storage: encoder {} + heads {} = {} bytes > budget {} bytes", enc_bytes, heads_bytes, total, b.flash));
         }
     }
+    let mean_delta = |f: fn(&QReport) -> f64| -> f64 {
+        (reports.iter().map(f).sum::<f64>() - reports_fp32.iter().map(f).sum::<f64>()) / reports.len().max(1) as f64
+    };
+    eprintln!(
+        "[j3v] head quantization: mean agreement delta {:+.4}, mean ECE delta {:+.4} (int8 - fp32); heads {:.1} KB -> {:.1} KB",
+        mean_delta(|r| r.agreement.value),
+        mean_delta(|r| r.ece.value),
+        heads_bytes_fp32 as f64 / 1e3,
+        heads_bytes as f64 / 1e3
+    );
     let mut report = base_report(o, &p, t0);
     report["encoder"] = json!(eng.enc.id);
     report["size"] = json!({"heads_bytes": heads_bytes, "encoder_bytes": enc_bytes, "total_bytes": total, "budget": o.budget});
     report["questions"] = json!(reports);
+    report["quantization"] = json!({
+        "heads": {
+            "int8_bytes": heads_bytes, "fp32_bytes": heads_bytes_fp32,
+            "note": "same architecture and weights, run through the identical Rust kernels; \
+                     only the int8 quantize/dequantize round-trip differs",
+            "questions": schema.questions.iter().zip(&reports).zip(&reports_fp32).map(|((q, i8r), f32r)| json!({
+                "id": q.id,
+                "agreement": {"int8": i8r.agreement.value, "fp32": f32r.agreement.value, "delta": i8r.agreement.value - f32r.agreement.value},
+                "ece": {"int8": i8r.ece.value, "fp32": f32r.ece.value, "delta": i8r.ece.value - f32r.ece.value},
+                "accuracy_gt": match (&i8r.accuracy_gt, &f32r.accuracy_gt) {
+                    (Some(a), Some(b)) => json!({"int8": a.value, "fp32": b.value, "delta": a.value - b.value}),
+                    _ => Value::Null,
+                },
+            })).collect::<Vec<_>>(),
+        }
+    });
     report["passed"] = json!(failures.is_empty());
     report["failures"] = json!(failures);
     std::fs::write(p.bdir.join("conformance.pi.json"), serde_json::to_string_pretty(&report).unwrap()).ok();

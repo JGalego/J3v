@@ -8,8 +8,65 @@ import json
 import math
 
 import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
 from . import artifact
+
+
+class Heads(nn.Module):
+    """Attention-pool + mean-pool + 2-layer MLP per question, over the shared encoder's token states.
+
+    Mirrors `Head::forward` in crates/j3v/src/heads.rs exactly, so the same weights score identically
+    whether run here (fp32, training/eval) or in the Rust runtime (int8, quantized).
+    """
+
+    def __init__(self, d, ks, hidden):
+        super().__init__()
+        self.d = d
+        self.a = nn.ParameterList([nn.Parameter(torch.zeros(d)) for _ in ks])
+        self.l1 = nn.ModuleList([nn.Linear(2 * d, hidden) for _ in ks])
+        self.l2 = nn.ModuleList([nn.Linear(hidden, k) for k in ks])
+        self.drop = nn.Dropout(0.1)
+
+    def forward(self, h, m):
+        mean = (h * m[..., None]).sum(1) / m.sum(1, keepdim=True)
+        out = []
+        for a, l1, l2 in zip(self.a, self.l1, self.l2):
+            s = (h @ a) / math.sqrt(self.d)
+            w = torch.softmax(s.masked_fill(~m, -1e9), 1)
+            f = torch.cat([(w[..., None] * h).sum(1), mean], -1)
+            out.append(l2(F.gelu(l1(self.drop(f)), approximate="tanh")))
+        return out
+
+    def tensors(self):
+        """Export as (name, np.ndarray) pairs in the `.j3a` layout `heads::quantize` expects."""
+        out = []
+        for j in range(len(self.a)):
+            out += [("q%d.a" % j, self.a[j].detach().numpy()), ("q%d.w1" % j, self.l1[j].weight.detach().numpy()),
+                    ("q%d.b1" % j, self.l1[j].bias.detach().numpy()), ("q%d.w2" % j, self.l2[j].weight.detach().numpy()),
+                    ("q%d.b2" % j, self.l2[j].bias.detach().numpy())]
+        return out
+
+    @classmethod
+    def from_tensors(cls, tensors):
+        """Load weights previously written by `tensors()`, e.g. from a `pi-heads` draft artifact."""
+        ks, j = [], 0
+        while ("q%d.w2" % j) in tensors:
+            ks.append(tensors["q%d.w2" % j].shape[0])
+            j += 1
+        d, hidden = tensors["q0.a"].shape[0], tensors["q0.w1"].shape[0]
+        net = cls(d, ks, hidden)
+        with torch.no_grad():
+            for j in range(len(ks)):
+                net.a[j].copy_(torch.from_numpy(tensors["q%d.a" % j]))
+                net.l1[j].weight.copy_(torch.from_numpy(tensors["q%d.w1" % j]))
+                net.l1[j].bias.copy_(torch.from_numpy(tensors["q%d.b1" % j]))
+                net.l2[j].weight.copy_(torch.from_numpy(tensors["q%d.w2" % j]))
+                net.l2[j].bias.copy_(torch.from_numpy(tensors["q%d.b2" % j]))
+        net.eval()
+        return net
 
 
 def load_feats(prefix):
@@ -27,34 +84,13 @@ def load_feats(prefix):
 
 
 def train(H, M, targets, ks, train_idx, calib_idx, hidden=128, epochs=60, lr=2e-3, seed=0, log=True):
-    import torch
-    import torch.nn as nn
-    import torch.nn.functional as F
     torch.manual_seed(seed)
     torch.set_num_threads(4)
     d = H.shape[-1]
 
-    class Heads(nn.Module):
-        def __init__(self):
-            super().__init__()
-            self.a = nn.ParameterList([nn.Parameter(torch.zeros(d)) for _ in ks])
-            self.l1 = nn.ModuleList([nn.Linear(2 * d, hidden) for _ in ks])
-            self.l2 = nn.ModuleList([nn.Linear(hidden, k) for k in ks])
-            self.drop = nn.Dropout(0.1)
-
-        def forward(self, h, m):
-            mean = (h * m[..., None]).sum(1) / m.sum(1, keepdim=True)
-            out = []
-            for a, l1, l2 in zip(self.a, self.l1, self.l2):
-                s = (h @ a) / math.sqrt(d)
-                w = torch.softmax(s.masked_fill(~m, -1e9), 1)
-                f = torch.cat([(w[..., None] * h).sum(1), mean], -1)
-                out.append(l2(F.gelu(l1(self.drop(f)), approximate="tanh")))
-            return out
-
     Ht, Mt = torch.from_numpy(H), torch.from_numpy(M)
     P = [torch.from_numpy(np.asarray(p, np.float32)) for p in targets]
-    net = Heads()
+    net = Heads(d, ks, hidden)
     opt = torch.optim.AdamW(net.parameters(), lr=lr, weight_decay=1e-4)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, epochs)
 
@@ -81,12 +117,7 @@ def train(H, M, targets, ks, train_idx, calib_idx, hidden=128, epochs=60, lr=2e-
         if log and (ep % 10 == 0 or ep == epochs - 1):
             print("  epoch %d calib soft-CE %.4f" % (ep, cl), flush=True)
     net.load_state_dict(best_state)
-    tensors = []
-    for j in range(len(ks)):
-        tensors += [("q%d.a" % j, net.a[j].detach().numpy()), ("q%d.w1" % j, net.l1[j].weight.detach().numpy()),
-                    ("q%d.b1" % j, net.l1[j].bias.detach().numpy()), ("q%d.w2" % j, net.l2[j].weight.detach().numpy()),
-                    ("q%d.b2" % j, net.l2[j].bias.detach().numpy())]
-    return tensors, best
+    return net.tensors(), best
 
 
 def main():

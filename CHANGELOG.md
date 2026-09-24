@@ -6,6 +6,10 @@
 - `install.sh`: one-line installer (`curl … | sh`) that picks the right static binary, verifies checksums, and
   can fetch the encoder and example models.
 - `j3v --version`.
+- `j3v compile --target pi` reports a `quantization.heads` section in `conformance.pi.json`: agreement/ECE/
+  accuracy for the shipped int8 heads vs. the fp32 draft, on the same states, through the same kernels.
+- `python -m j3vc.encoder_quant_effect`: compares the trained heads' accuracy/ECE on the shared encoder's
+  int8 (shipped) features against fresh fp32 features from the original HuggingFace checkpoint.
 
 ## [0.1.1] - 2026-09-23
 
