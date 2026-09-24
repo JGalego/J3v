@@ -1,0 +1,37 @@
+# The cascade as two containers: the j3v artifact answers what it is sure about, and forwards only the
+# questions below their threshold to Laya. `--upstream` does the escalation server side, per question --
+# clients keep making one call and stop seeing `escalate: true`.
+#
+#   docker compose up          # j3v alone on :8000
+#   docker compose --profile cascade up   # j3v -> laya
+services:
+  j3v:
+    build: .
+    ports: ["8000:8000"]
+    environment:
+      # Set to require `Authorization: Bearer <key>`. Unset (the default) means no auth: keep it on a
+      # private network, or put a reverse proxy in front -- j3v serves plain HTTP and does not terminate TLS.
+      J3V_API_KEY: "${J3V_API_KEY:-}"
+    # The healthcheck hits /healthz, which reports the loaded artifact's id.
+    healthcheck:
+      test: ["CMD", "/j3v", "predict", "--encoder", "/models/minilm.j3a", "/models/model.j3a", "{\"state\":{\"message\":\"ping\"}}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Same artifact, but unsure answers go upstream. The upstream must speak Laya's POST /v1/systemone.
+  j3v-cascade:
+    build: .
+    profiles: ["cascade"]
+    ports: ["8001:8000"]
+    depends_on: [laya]
+    entrypoint: ["/j3v", "serve", "/models/model.j3a", "--encoder", "/models/minilm.j3a",
+                 "--addr", "0.0.0.0:8000", "--threads", "1", "--upstream", "http://laya:8000"]
+
+  # Stand-in for your Laya / Jev deployment. Replace `image:` with whatever serves the teacher you
+  # compiled against -- the artifact was calibrated to *that* teacher, so pointing it at a different one
+  # invalidates the cascade's conformance report.
+  laya:
+    profiles: ["cascade"]
+    image: ghcr.io/example/laya-serve:latest
+    ports: ["8100:8000"]
