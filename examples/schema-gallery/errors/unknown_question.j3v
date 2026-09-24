@@ -1,0 +1,8 @@
+# A per-question bound or threshold that names a question the schema does not declare. Easy to write after a
+# rename; the parser lists the questions that do exist.
+schema unknown_question
+choice channel "Where did this message arrive?"
+  email "an email to support"
+  chat  "the in-app chat widget"
+threshold channel 0.9
+require urgency.agreement >= 0.8

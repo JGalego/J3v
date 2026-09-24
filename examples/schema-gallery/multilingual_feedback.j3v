@@ -1,0 +1,38 @@
+# App-store review triage for a product shipped in several countries.
+#
+# What this one shows: the **multilingual teacher**. `teacher laya-multilingual` picks Laya's multilingual
+# checkpoint, so the states may be in any language it covers while the answer space stays English. The answer
+# keys are what your code branches on, so they never vary by language.
+schema multilingual_feedback
+version 1
+teacher laya-multilingual
+max_state_tokens 96
+
+choice topic "What is this review mainly about?"
+  crash      "the app closes, freezes or fails to start"
+  usability  "confusing layout, hard to find a feature, bad wording"
+  pricing    "subscription cost, trial length, unexpected charges"
+  content    "the catalogue itself: missing, wrong or low-quality items"
+  praise     "positive feedback with no specific problem"
+
+score sentiment "How positive is this review?"
+  "angry, asking for a refund or threatening to uninstall"
+  "unhappy but still using the app"
+  "neutral or mixed"
+  "satisfied"
+  "enthusiastic, would recommend"
+
+noul actionable "Does the review name a specific, reproducible problem an engineer could act on?"
+  false "a general opinion, with no steps, screen or feature named"
+  true  "names a screen, a step or a device, so it could be reproduced"
+
+threshold 0.80
+# Sentiment orders the review queue; it does not page anyone. A less certain answer is still worth keeping.
+threshold sentiment 0.55
+
+require agreement >= 0.85
+require ece <= 0.05
+# 5 ordinal levels: adjacent levels are genuinely hard to separate, so hold sentiment to expected-score error
+# (in levels) rather than to argmax agreement. See schemas/support_triage.j3v for the same argument on 3 levels.
+require sentiment.agreement >= 0.70
+require sentiment.mae <= 0.40

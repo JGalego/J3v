@@ -1,0 +1,40 @@
+# Triage for incoming pull requests on a busy repository.
+#
+# What this one shows: **per-question bounds and thresholds doing real work**, and a `require accuracy` floor.
+# `accuracy` is checked against ground-truth labels in the states file, so it only applies to questions whose
+# states carry a `labels` entry -- here, `area` and `breaking_change`, which come from the merged PR's own
+# labels. `risk` has no ground truth and is held to agreement with the teacher instead.
+schema pr_triage
+version 1
+teacher laya
+max_state_tokens 128
+
+choice area "Which part of the system does this pull request touch?"
+  compiler  "the schema front end, distillation or the conformance gate"
+  runtime   "the inference binary, serving or the kernels"
+  firmware  "the mcu target and anything built for a board"
+  docs      "documentation, examples and the README"
+  build     "CI, packaging, release and the installer"
+
+score risk "How risky is merging this without a careful review?"
+  "mechanical or generated; a skim is enough"
+  "ordinary change to one area"
+  "touches calibration, numerics or the artifact format"
+
+noul breaking_change "Does this pull request change a public interface in a way that would break existing callers?"
+  false "additive, internal, or a fix that keeps the same interface"
+  true  "renames, removes or changes the meaning of a flag, endpoint, field or artifact format"
+
+threshold 0.80
+# A wrong `area` just routes the review to the wrong team, which a human fixes in seconds.
+threshold area 0.70
+# A missed breaking change ships. Escalate unless the artifact is very sure.
+threshold breaking_change 0.92
+
+require agreement >= 0.85
+require ece <= 0.05
+# Ground truth exists for these two, so demand it directly, not just agreement with the teacher.
+require area.accuracy >= 0.88
+require breaking_change.accuracy >= 0.95
+require breaking_change.ece <= 0.03
+require risk.mae <= 0.35

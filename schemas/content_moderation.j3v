@@ -1,0 +1,42 @@
+# Comment moderation for a news site's discussion section. Ground truth for `violation`, `profanity` and
+# `threat` comes from the Civil Comments crowd ratings (see examples/content_moderation/prepare.py);
+# `severity` has none, so it is held to agreement and expected-score error against the teacher.
+schema content_moderation
+version 1
+teacher laya
+max_state_tokens 128
+
+choice violation "Which community guideline, if any, does this comment break?"
+  none            "disagreement, criticism or blunt language that breaks no rule"
+  insult          "attacks or demeans another person"
+  profanity       "obscene or sexually explicit language"
+  threat          "threatens violence or harm against someone"
+  identity_attack "attacks a group over race, religion, gender, orientation, disability or nationality"
+
+score severity "How severe is this comment for a reader who is its target?"
+  "harmless"
+  "rude or heated, but tolerable"
+  "hostile enough to drive someone away"
+
+noul profanity "Does the comment contain obscene or sexually explicit language?"
+  false "no obscenity, even if the comment is hostile"
+  true  "obscene or sexually explicit wording"
+
+noul threat "Does the comment threaten violence or physical harm against a person or group?"
+  false "hostile, but no threat of harm"
+  true  "threatens violence or physical harm"
+
+# Moderation decisions are appealable and visible, so the default is conservative.
+threshold 0.80
+# `severity` only orders the review queue, so a less certain answer is still worth keeping locally.
+threshold severity 0.60
+# A missed threat is the costly error in this schema: escalate anything short of near-certainty.
+threshold threat 0.95
+
+require agreement >= 0.85
+require ece <= 0.05
+# `severity` is a 3-level ordinal with no ground truth: the teacher routinely splits its mass across two
+# adjacent levels, so argmax agreement is a noisy target. Held to expected-score error instead, plus a looser
+# agreement floor -- the same treatment `urgency` gets in support_triage.j3v. (Both set after the first build.)
+require severity.agreement >= 0.75
+require severity.mae <= 0.30

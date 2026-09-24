@@ -1,0 +1,44 @@
+# systemd unit for a Raspberry Pi. Install with:
+#
+#   J3V_MODELS=/var/lib/j3v curl -fsSL https://raw.githubusercontent.com/JGalego/J3v/main/install.sh | sh
+#   sudo useradd --system --no-create-home --shell /usr/sbin/nologin j3v
+#   sudo cp j3v.service /etc/systemd/system/ && sudo systemctl enable --now j3v
+#
+# The runtime is a single static binary that mmaps two read-only files, so the unit can give away nearly
+# every privilege there is.
+[Unit]
+Description=J3v system-one decisions (support_triage)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=j3v
+Group=j3v
+ExecStart=/usr/local/bin/j3v serve /var/lib/j3v/support_triage.pi.j3a \
+  --encoder /var/lib/j3v/minilm.j3a \
+  --addr 127.0.0.1:8000 \
+  --threads 1
+# Put the bearer token in a root-owned file, not in this unit: `J3V_API_KEY=...`, chmod 600.
+EnvironmentFile=-/etc/j3v.env
+Restart=always
+RestartSec=2
+
+# Nothing here writes, execs, or needs a network beyond its listening socket.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+MemoryDenyWriteExecute=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+ReadOnlyPaths=/var/lib/j3v
+
+[Install]
+WantedBy=multi-user.target
