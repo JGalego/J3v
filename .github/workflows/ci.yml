@@ -23,11 +23,28 @@ jobs:
       - run: cargo test --workspace
       - name: schema DSL smoke check
         run: cargo run --release -q -- check schemas/support_triage.j3v > /dev/null
+      - name: every shipped and example schema parses
+        run: |
+          for f in schemas/*.j3v examples/schema-gallery/*.j3v examples/schema-gallery/*.json; do
+            cargo run --release -q -- check "$f" > /dev/null || { echo "::error file=$f::schema failed to parse"; exit 1; }
+          done
+      - name: the schemas that must not compile still say why
+        run: |
+          # examples/schema-gallery/errors/ exists to demonstrate diagnostics. If one of these ever parses,
+          # either the language changed or the example is stale -- both are worth failing on.
+          for f in examples/schema-gallery/errors/*.j3v; do
+            if cargo run --release -q -- check "$f" > /dev/null 2> err.txt; then
+              echo "::error file=$f::expected this schema to be rejected, but it parsed"; exit 1
+            fi
+            grep -q '^error: ' err.txt || { echo "::error file=$f::no rustc-style diagnostic"; cat err.txt; exit 1; }
+          done
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: python compiler stage compiles
         run: python -m compileall -q compiler
+      - name: example scripts compile
+        run: python -m compileall -q examples
 
   static:
     name: static pi binary (${{ matrix.target }})
@@ -167,6 +184,50 @@ jobs:
             --states $D/data/heldout.jsonl --teacher $D/data/laya.heldout.json -o cascade.json 2> cascade.txt || { cat cascade.txt; exit 1; }
           cat cascade.txt
           { echo '### cascade (offline, cached Laya answers)'; echo '```'; sed -n '/routing with conditional/,$p' cascade.txt | grep -v 'conditional temperatures'; echo '```'; } >> $GITHUB_STEP_SUMMARY
+
+  deployment:
+    name: deployment example (serve + clients)
+    runs-on: ubuntu-latest
+    env:
+      MINILM: https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release -p j3v
+      - uses: actions/cache@v4
+        with:
+          path: minilm.j3a
+          key: minilm-x86-1110a243-int8-${{ hashFiles('crates/j3v/src/encoder.rs') }}
+      - name: import the shared int8 encoder
+        run: |
+          [ -f minilm.j3a ] && exit 0
+          mkdir -p hf && for f in model.safetensors config.json vocab.txt tokenizer_config.json; do curl -sSfL "$MINILM/$f" -o hf/$f; done
+          ./target/release/j3v encoder import hf -o minilm.j3a sentence-transformers/all-MiniLM-L6-v2@1110a243
+      - name: serve the committed artifact
+        run: |
+          ./target/release/j3v serve examples/support_triage/support_triage.pi.j3a \
+            --encoder minilm.j3a --addr 127.0.0.1:8000 &
+          for _ in $(seq 1 60); do curl -sf localhost:8000/healthz > /dev/null && break; sleep 1; done
+          curl -sf localhost:8000/healthz
+      - name: examples/deployment/client.py answers and reports a tier
+        run: |
+          python3 examples/deployment/client.py --url http://127.0.0.1:8000 \
+            "I was charged twice, please refund me" | tee out.txt
+          grep -q "department" out.txt
+          grep -q "tier=pi" out.txt
+      - name: client.py surfaces an escalating answer rather than rounding it
+        run: |
+          python3 examples/deployment/client.py --url http://127.0.0.1:8000 \
+            "can you help me with that thing we discussed" | tee esc.txt
+          grep -q "(escalate)" esc.txt
+      - name: client.py refuses a question the artifact was not compiled for
+        run: |
+          if python3 examples/deployment/client.py --url http://127.0.0.1:8000 --only sentiment hi; then
+            echo "::error::expected a failure for an uncompiled question"; exit 1
+          fi
+      - name: examples/deployment/client.sh
+        run: sh examples/deployment/client.sh http://127.0.0.1:8000 > /dev/null
 
   install:
     name: install.sh (${{ matrix.os }})
