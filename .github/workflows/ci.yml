@@ -206,10 +206,12 @@ jobs:
           ./target/release/j3v encoder import hf -o minilm.j3a sentence-transformers/all-MiniLM-L6-v2@1110a243
       - name: serve the committed artifact
         run: |
-          ./target/release/j3v serve examples/support_triage/support_triage.pi.j3a \
-            --encoder minilm.j3a --addr 127.0.0.1:8000 &
+          # nohup + disown so the server outlives this step's shell and is still up for the next ones
+          nohup ./target/release/j3v serve examples/support_triage/support_triage.pi.j3a \
+            --encoder minilm.j3a --addr 127.0.0.1:8000 > serve.log 2>&1 &
+          disown || true
           for _ in $(seq 1 60); do curl -sf localhost:8000/healthz > /dev/null && break; sleep 1; done
-          curl -sf localhost:8000/healthz
+          curl -sf localhost:8000/healthz || { echo "server did not come up:"; cat serve.log; exit 1; }
       - name: examples/deployment/client.py answers and reports a tier
         run: |
           python3 examples/deployment/client.py --url http://127.0.0.1:8000 \
