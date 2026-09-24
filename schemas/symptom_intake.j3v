@@ -1,0 +1,47 @@
+# Front-desk triage of a free-text symptom description, before a clinician reads it. This is a *routing*
+# schema: it decides which queue a message joins and how fast a human should look at it. It does not
+# diagnose, and nothing it answers is a clinical finding -- see examples/symptom_intake/README.md.
+#
+# Ground truth for `body_system` is derived from the dataset's own diagnosis label
+# (see examples/symptom_intake/prepare.py). The other three questions have none and are held to agreement
+# with the teacher.
+schema symptom_intake
+version 1
+teacher laya
+max_state_tokens 128
+
+choice body_system "Which part of the body do these symptoms point to?"
+  respiratory   "airway, lungs, breathing, cough, congestion"
+  digestive     "stomach, bowel, nausea, vomiting, diarrhoea, liver"
+  musculoskel   "joints, muscles, back, neck, limbs"
+  skin          "rash, itching, blisters, lesions, discolouration"
+  neuro         "headache, dizziness, vision, balance, numbness"
+  systemic      "whole-body: fever, fatigue, weight change, night sweats"
+  urinary       "bladder, kidneys, urination"
+  cardiovascular "chest, heart, circulation, blood pressure"
+
+score urgency "How quickly should a clinician look at this message?"
+  "routine: a scheduled appointment is fine"
+  "same day: should be seen today"
+  "immediate: needs attention right now"
+
+noul red_flag "Does the message describe a symptom that is dangerous on its own, such as chest pain, trouble breathing, a sudden severe headache, or heavy bleeding?"
+  false "uncomfortable or persistent, but not dangerous by itself"
+  true  "names a symptom that is dangerous on its own"
+
+noul self_reported_duration "Does the message say how long the symptoms have lasted?"
+  false "no duration given"
+  true  "gives a duration, onset or timeframe"
+
+# Routing is the decision; a wrong queue is recoverable, but only by a human noticing.
+threshold 0.80
+# `urgency` orders the queue rather than deciding it, so it is allowed to answer less certainly.
+threshold urgency 0.65
+# `red_flag` is the one question that can shorten someone's wait. It escalates unless it is almost certain,
+# and it is deliberately biased toward escalating: a false `false` is the error that matters here.
+threshold red_flag 0.97
+
+require agreement >= 0.85
+require ece <= 0.05
+require urgency.agreement >= 0.75
+require urgency.mae <= 0.30
