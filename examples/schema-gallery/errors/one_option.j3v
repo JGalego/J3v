@@ -1,0 +1,5 @@
+# A choice with a single option is not a decision. (A `noul` is the right type for a yes/no.)
+schema one_option
+choice approved "Should this be approved?"
+  yes "approve it"
+threshold 0.8

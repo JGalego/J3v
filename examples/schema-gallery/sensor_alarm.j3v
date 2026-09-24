@@ -1,0 +1,39 @@
+# Free-text fault lines from industrial equipment, classified on the device itself.
+#
+# What this one shows: a **schema shaped for the mcu target**. The states are short and machine-generated, so
+# `max_state_tokens` is small; every question is cheap; and the bounds are set where a hashed-n-gram int8 model
+# under a flash budget can actually land. Compile it with:
+#
+#   j3v compile examples/schema-gallery/sensor_alarm.j3v --target mcu --budget flash=256KB,ram=32KB \
+#     --states states.jsonl -o sensor_alarm.mcu.j3a
+#
+# If nothing fits the budget, the compiler fails with `error[E0302]` *before* training anything.
+schema sensor_alarm
+version 1
+teacher laya
+# Fault lines are short and formulaic ("PUMP2 SEAL TEMP HIGH 96C"). Anything longer is truncated.
+max_state_tokens 32
+
+choice subsystem "Which subsystem does this fault line come from?"
+  power    "supply, battery, converter, mains"
+  motion   "motor, drive, actuator, servo, pump"
+  thermal  "temperature, coolant, fan, heat sink"
+  sensing  "a sensor or its wiring reads out of range or not at all"
+  comms    "bus, link, gateway or network errors"
+
+score severity "How urgently does a technician need to look at this?"
+  "informational, no action"
+  "schedule it into the next maintenance window"
+  "stop the line now"
+
+noul self_clearing "Does the line say the condition already recovered on its own?"
+  false "the condition is still present, or the line does not say"
+  true  "the line reports recovery, reset or a return to normal"
+
+threshold 0.80
+# Stopping a production line is expensive in both directions, so severity escalates readily.
+threshold severity 0.85
+
+require agreement >= 0.85
+require ece <= 0.05
+require severity.mae <= 0.30

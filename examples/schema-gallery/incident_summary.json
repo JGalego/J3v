@@ -1,0 +1,36 @@
+{
+  "name": "incident_summary",
+  "teacher": "laya",
+  "max_state_tokens": 128,
+  "threshold": 0.8,
+  "questions": {
+    "component": {
+      "type": "choice",
+      "instructions": "Which component is the incident about?",
+      "criteria": {
+        "api": "the public HTTP API and its gateway",
+        "database": "storage, replication, migrations, backups",
+        "queue": "the message broker and its consumers",
+        "auth": "login, tokens, permissions",
+        "infra": "hosts, network, DNS, certificates"
+      }
+    },
+    "customer_impact": {
+      "type": "score",
+      "instructions": "How much did customers notice?",
+      "criteria": [
+        "internal only, no customer could tell",
+        "degraded for some customers",
+        "a full outage for many customers"
+      ]
+    },
+    "paged_oncall": {
+      "type": "noul",
+      "instructions": "Did this incident page the on-call engineer?",
+      "criteria": {
+        "false": "handled during business hours, no page",
+        "true": "an alert paged someone"
+      }
+    }
+  }
+}

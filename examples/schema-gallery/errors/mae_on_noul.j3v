@@ -1,0 +1,6 @@
+# `mae` is the mean error of the *expected score* in levels, so it only means anything for an ordinal `score`
+# question. Asking for it on a noul is a type error, caught at parse time.
+schema mae_on_noul
+noul is_spam "Is this message spam?"
+threshold 0.8
+require is_spam.mae <= 0.2
