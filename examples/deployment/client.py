@@ -25,9 +25,13 @@ class J3v:
     def __init__(self, url="http://127.0.0.1:8000", key=None, timeout=10.0):
         self.url, self.key, self.timeout = url.rstrip("/"), key or os.environ.get("J3V_API_KEY"), timeout
 
-    def _post(self, path, body):
-        data = json.dumps(body).encode()
-        req = urllib.request.Request(self.url + path, data=data, headers={"Content-Type": "application/json"})
+    def _call(self, path, body=None):
+        """One request. The bearer token, when set, goes on *every* route -- the server checks it before
+        it routes, so a GET needs it as much as the POST does."""
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(self.url + path, data=data)
+        if body is not None:
+            req.add_header("Content-Type", "application/json")
         if self.key:
             req.add_header("Authorization", "Bearer " + self.key)
         try:
@@ -38,8 +42,7 @@ class J3v:
 
     def schema(self):
         """The compiled questions and their escalation thresholds, straight from the artifact."""
-        with urllib.request.urlopen(self.url + "/v1/schema", timeout=self.timeout) as r:
-            return json.load(r)
+        return self._call("/v1/schema")
 
     def ask(self, state, only=None):
         """Answer `state`. `only` restricts to a subset of the compiled questions.
@@ -55,7 +58,7 @@ class J3v:
                 raise KeyError("not compiled into this artifact: %s (have: %s)"
                                % (", ".join(missing), ", ".join(compiled)))
             body["questions"] = {q: compiled[q] for q in only}
-        return self._post("/v1/systemone", body)
+        return self._call("/v1/systemone", body)
 
 
 def value(answer):

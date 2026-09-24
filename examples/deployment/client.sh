@@ -4,15 +4,15 @@
 #   ./client.sh [base-url]        default: http://127.0.0.1:8000
 set -eu
 J3V="${1:-http://127.0.0.1:8000}"
-# J3V_API_KEY, if set, is sent as a bearer token (the server requires it when it was started with one).
 
+# The server checks the bearer token before it routes, so every call below sends it when it is set.
 echo "== is it up, and which artifact is loaded?"
-curl -fsS "$J3V/healthz"; echo
+curl -fsS ${J3V_API_KEY:+-H "Authorization: Bearer $J3V_API_KEY"} "$J3V/healthz"; echo
 
 echo
 echo "== what was this artifact compiled to answer, and at which thresholds?"
 # The thresholds come from the schema, so a client never hardcodes them.
-curl -fsS "$J3V/v1/schema" | head -c 400; echo
+curl -fsS ${J3V_API_KEY:+-H "Authorization: Bearer $J3V_API_KEY"} "$J3V/v1/schema" | head -c 400; echo
 
 echo
 echo "== ask the whole schema"
