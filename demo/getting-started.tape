@@ -28,6 +28,11 @@
 #   - VHS captures frames slower than realtime here, so the GIF plays back
 #     faster than the tape runs. The Sleeps after each JSON dump are padded
 #     to keep the output on screen long enough to read.
+#   - The minilm.j3a download sits on a static screen for ~16s. The
+#     committed GIF has that stretch cut to ~2s after recording, by
+#     dropping the idle frames at a point where the cursor blink matches:
+#       gifsicle in.gif --delete '#START-END' -o demo/getting-started.gif
+#     (frames are deltas, so only cut between two identical composites).
 
 Output demo/getting-started.gif
 
